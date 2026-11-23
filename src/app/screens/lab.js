@@ -25,6 +25,13 @@ const SCENE_TEXT = {
   warming: 'Starting',
   unstable: 'Too much change',
   adapting: 'Settling',
+  motion: 'Movement in view',
+};
+
+const REJECTION_TEXT = {
+  cooldown: 'too soon after the previous hit',
+  persistent: 'stayed lit too long to be a flash',
+  motion: 'something else moved or the light changed',
 };
 
 export function labScreen(root) {
@@ -65,7 +72,7 @@ export function labScreen(root) {
         <div class="field">
           <label for="lab-flash">Test flash length</label>
           <select id="lab-flash">
-            <option value="1">1 screen frame</option>
+            <option value="16">17 ms (1 video frame)</option>
             <option value="33">33 ms</option>
             <option value="50">50 ms</option>
             <option value="100">100 ms</option>
@@ -115,8 +122,8 @@ export function labScreen(root) {
         <summary>What this does and does not show</summary>
         <ul class="notes">
           <li>The test pattern is drawn by this app at the screen's refresh rate. Passing it shows the detection logic works; it says nothing about a real camera sensor or a real laser.</li>
-          <li>A test flash drawn for a single screen frame can be dropped by the test pattern's own video capture before detection ever sees it. Those count as “Missed” here even though the detector never had the frame.</li>
-          <li>“Rejected” counts things seen but not reported as hits: a second flash too soon after the first, or something red that stayed in view.</li>
+          <li>The shortest test flash is one video frame (about 17 ms). On a 120 Hz screen anything shorter is drawn and gone between two video frames, so it would never reach detection at all.</li>
+          <li>“Rejected” counts things seen but not reported as hits: a second flash too soon after the first, something red that stayed in view, or a spot seen while other things were moving or the light was changing.</li>
           <li>The camera source has no ground truth, so only detected hits are counted. Its settings are untuned guesses until measured with the LED fixture.</li>
           <li>Hit strength (weak / fair / strong) is a rough signal level, not a probability.</li>
           <li>Nothing here checks or implies that a firearm is safe.</li>
@@ -249,8 +256,11 @@ export function labScreen(root) {
       emitted,
       detected: [],
       rejected: 0,
+      rejectedBy: { cooldown: 0, persistent: 0, motion: 0 },
       frames: 0,
       scene: 'warming',
+      sceneCounts: {},
+      motionPct: [],
       costMs: [],
       delivery: createFrameStats(),
       patternStats: () => synthetic?.stats() ?? null,
@@ -269,6 +279,9 @@ export function labScreen(root) {
         const result = pipeline.process(image.data, frame.now);
         run.frames += 1;
         run.scene = result.status;
+        run.sceneCounts[result.status] = (run.sceneCounts[result.status] ?? 0) + 1;
+        run.motionPct.push(result.motionFraction * 100);
+        if (run.motionPct.length > 600) run.motionPct.shift();
         run.costMs.push(performance.now() - t0);
         if (run.costMs.length > 240) run.costMs.shift();
         if (result.event) onEvent(result.event);
@@ -296,7 +309,8 @@ export function labScreen(root) {
       drawOverlay(); // show the hit straight away rather than on the next refresh
     } else {
       run.rejected += 1;
-      addLog(event.reason === 'persistent' ? 'Rejected · stayed lit too long to be a flash' : 'Rejected · too soon after the previous hit');
+      run.rejectedBy[event.reason] = (run.rejectedBy[event.reason] ?? 0) + 1;
+      addLog(`Rejected · ${REJECTION_TEXT[event.reason] ?? event.reason}`);
     }
   }
 
@@ -311,12 +325,17 @@ export function labScreen(root) {
     return {
       app: 'LaserRange',
       report: 'detection-lab',
-      reportVersion: 2,
+      reportVersion: 3,
       build: BUILD_ID,
       createdAt: new Date().toISOString(),
       settings: run.settings,
       video: { width: video.videoWidth, height: video.videoHeight },
       working: run.working,
+      // Frames by scene state, and how much of the frame changed between
+      // consecutive frames (percent, last 600 frames): for tuning movement rejection.
+      sceneFrames: run.sceneCounts,
+      frameChangePct: summarize(run.motionPct),
+      rejectedBy: run.rejectedBy,
       // How frames reached the detector: needed to tell "detector missed it"
       // apart from "the frame never arrived".
       delivery,
@@ -334,6 +353,7 @@ export function labScreen(root) {
         durationMs: hit.durationMs,
         peak: hit.peak,
         area: hit.area,
+        strayPct: hit.stray * 100,
         confidence: hit.confidence,
       })),
     };

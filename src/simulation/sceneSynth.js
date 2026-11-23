@@ -19,20 +19,36 @@ export function mulberry32(seed) {
 /**
  * @param {{ width: number, height: number, seed?: number, base?: number, noise?: number }} options
  *   base: grey level of the scene (0-255); noise: +/- range added independently per channel per frame.
- * @returns {(frame?: { flashes?: { x: number, y: number, radius: number, intensity: number, core?: boolean }[], brightness?: number }) => Uint8ClampedArray}
+ * @returns {(frame?: { flashes?: { x: number, y: number, radius: number, intensity: number, core?: boolean }[], objects?: { x: number, y: number, w: number, h: number, color: number[] }[], brightness?: number }) => Uint8ClampedArray}
  *   flashes use normalised x/y (0-1), radius in pixels, intensity 0-1. `core: true` blows the centre out to white.
- *   brightness shifts the whole scene.
+ *   objects are solid rectangles in pixel coordinates. brightness shifts the whole scene.
  */
 export function createSceneRenderer({ width, height, seed = 1, base = 110, noise = 6 }) {
   const rand = mulberry32(seed);
 
-  return function render({ flashes = [], brightness = 0 } = {}) {
+  return function render({ flashes = [], objects = [], brightness = 0 } = {}) {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let j = 0; j < data.length; j += 4) {
       data[j] = base + brightness + (rand() * 2 - 1) * noise;
       data[j + 1] = base + brightness + (rand() * 2 - 1) * noise;
       data[j + 2] = base + brightness + (rand() * 2 - 1) * noise;
       data[j + 3] = 255;
+    }
+
+    // Solid rectangles (pixel coordinates), e.g. something passing through view.
+    for (const object of objects) {
+      const x0 = Math.max(0, Math.round(object.x));
+      const x1 = Math.min(width, Math.round(object.x + object.w));
+      const y0 = Math.max(0, Math.round(object.y));
+      const y1 = Math.min(height, Math.round(object.y + object.h));
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const j = (y * width + x) * 4;
+          data[j] = object.color[0];
+          data[j + 1] = object.color[1];
+          data[j + 2] = object.color[2];
+        }
+      }
     }
 
     for (const flash of flashes) {

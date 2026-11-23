@@ -15,13 +15,14 @@ const FRAME_MS = 1000 / 60;
  * Renders `frames` synthetic frames at 60 fps and runs them through the pipeline.
  * flashesFor(frameIndex) returns the flashes visible in that frame.
  */
-function runSequence({ frames, flashesFor = () => [], brightnessFor = () => 0, params, seed = 7, noise = 6 }) {
+function runSequence({ frames, flashesFor = () => [], objectsFor = () => [], brightnessFor = () => 0, params, seed = 7, noise = 6 }) {
   const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed, noise });
   const pipeline = createFlashPipeline(WIDTH, HEIGHT, params);
   const events = [];
   const statuses = new Set();
   for (let i = 0; i < frames; i++) {
-    const result = pipeline.process(render({ flashes: flashesFor(i), brightness: brightnessFor(i) }), i * FRAME_MS);
+    const frame = render({ flashes: flashesFor(i), objects: objectsFor(i), brightness: brightnessFor(i) });
+    const result = pipeline.process(frame, i * FRAME_MS);
     statuses.add(result.status);
     if (result.event) events.push(result.event);
   }
@@ -133,6 +134,34 @@ describe('flash pipeline on synthetic frames', () => {
     expect(events.filter((event) => event.reason === 'persistent')).toHaveLength(1);
     expect(hits).toHaveLength(1);
     expect(hits[0].x).toBeCloseTo(0.8, 1);
+  });
+
+  describe('something reddish moving through view (like a hand)', () => {
+    // A thin skin-toned bar sweeping across at 4 px per frame. Its leading
+    // edge alone is small and red enough to pass for a spot.
+    const sweep = (i) => (i >= 30 && i < 70 ? [{ x: (i - 30) * 4, y: 40, w: 4, h: 30, color: [230, 140, 120] }] : []);
+
+    it('is not reported, and is recognised as movement', () => {
+      const { hits, statuses } = runSequence({ frames: 100, objectsFor: sweep });
+      expect(hits).toHaveLength(0);
+      expect(statuses.has('motion')).toBe(true);
+    });
+
+    it('would be reported without the movement check (so the test above means something)', () => {
+      const { hits } = runSequence({ frames: 100, objectsFor: sweep, params: { maxStrayFraction: 1 } });
+      expect(hits.length).toBeGreaterThan(0);
+    });
+
+    it('does not stop a flash elsewhere from being found once the movement ends', () => {
+      const { hits } = runSequence({
+        frames: 120,
+        objectsFor: sweep,
+        flashesFor: (i) => (i === 90 ? [dot({ x: 0.7, y: 0.8 })] : []),
+      });
+      expect(hits).toHaveLength(1);
+      expect(hits[0].x).toBeCloseTo(0.7, 1);
+      expect(hits[0].stray).toBeLessThan(0.003);
+    });
   });
 
   it('rejects a red region far larger than a laser dot', () => {

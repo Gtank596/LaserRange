@@ -15,8 +15,8 @@ against a real camera, LED, or cartridge, and nothing is scored or saved yet.
 | Dashboard (stats, target overlay, navigation) | Built, using sample data that is labeled as such |
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
-| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes and lingering red objects | Built; 20 deterministic unit tests on synthetic frames |
-| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; test pattern checked on desktop at about 1 frame per second only (throttled background tab). **Not yet run at full frame rate or on a camera** |
+| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 23 deterministic unit tests on synthetic frames |
+| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern and on a still camera scene (see "Measured so far"). **No real red flash tested yet** |
 | Ring scoring maths | Built and unit tested; not yet connected to a camera |
 | Calibration, sessions, history, offline service worker | Not built |
 
@@ -125,6 +125,32 @@ camera. Each run is only 14 to 23 flashes.
 - The point to carry forward: **a flash that fits inside one frame is the fragile case.** How long the real
   cartridge's flash lasts is the number that matters most, and it is still unknown.
 
+**Cause of the single-frame misses, confirmed** (build `1c6d686`, 40 flashes): the test pattern was being drawn at
+120 fps (the screen's refresh rate) while video reached the detector at 58 fps with no missed frames. A flash
+drawn for one 8 ms screen frame is gone before the next video frame about half the time: 26 of 40 never reached
+the detector, and all 14 that did were found at full strength. The shortest test flash is now one video frame.
+
+### First runs on the real rear camera
+
+Nov 23, 2026, build `1c6d686`, installed app, phone propped, pointed at a plain still scene. Daylight with the
+shades closed (medium brightness). Detection at 320 x 569 pixels.
+
+| Run | Sensitivity | Length | Hits | Rejected | Notes |
+|---|---|---|---|---|---|
+| Still scene | Normal | 2610 frames (~44 s) | 0 | 0 | |
+| Still scene | High | 3164 frames (~53 s) | 0 | 0 | 2 frames not delivered |
+| Hand waved twice, room light switched off and on | Normal | 2126 frames (~35 s) | **3 false** | 7 | |
+
+- Frames arrived at 59.85 fps; detection plus frame copy cost 5.7 to 5.9 ms per frame.
+- On a still scene there were no false hits even at High sensitivity, over about 97 seconds in total. One scene,
+  one lighting condition.
+- The three false hits during the disturbance run were all barely over the threshold (peak 60.5 to 62.7 against a
+  threshold of 60), one frame long, 2 to 9 pixels. Which disturbance caused them was not recorded; skin tones
+  moving through view are the likely source.
+- In response the detector now skips frames where anything other than the spot itself changed, and discards a hit
+  if the scene was disturbed while it was forming. This is covered by synthetic tests but **has not been re-run on
+  the camera**. No real red flash has been shown to the camera yet.
+
 ## How detection works
 
 Each frame is shrunk to 320 pixels wide and compared with a slowly updating memory of the scene.
@@ -134,8 +160,15 @@ Each frame is shrunk to 320 pixels wide and compared with a slowly updating memo
 2. **Per frame:** changed pixels are grouped into regions. A region must be small (a dot, not a red shirt) and
    contain at least one genuinely red pixel. If a large share of the frame changes at once, the frame is treated
    as a lighting change or camera movement and skipped.
-3. **Across frames:** spots in consecutive frames at the same place become one hit. Something that stays lit
+3. **Movement check:** a flash changes its own spot and nothing else. If other parts of the frame changed since
+   the previous frame, or a changed region is too big to be a dot, something is moving in view; the frame is
+   skipped and any hit that was forming is discarded.
+4. **Across frames:** spots in consecutive frames at the same place become one hit. Something that stays lit
    longer than 400 ms is rejected as an object, and a second hit within 120 ms of the last is suppressed.
+
+Known gap: a small reddish object entering the view slowly, with no trailing edge yet in frame, can still look
+like a flash for a frame or two. Limiting detection to the calibrated target area (milestone 4) should reduce
+this.
 
 All thresholds live in `src/detection/params.js` and are untuned starting guesses. `src/simulation/exposureModel.js`
 is an illustrative model of how a short flash overlaps a frame's exposure; it is for building test sequences and

@@ -19,6 +19,14 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   maxCandidateFraction: 0.03,
   /** How quickly the background follows the scene (0-1 per frame). */
   backgroundRate: 0.05,
+  /** Brightness change (0-255) since the previous frame that counts a pixel as "moving". */
+  motionDelta: 30,
+  /**
+   * A flash changes only its own spot. If more than this share of the frame
+   * changed since the previous frame, not counting the spot itself, something
+   * is moving in view (a hand, a person) and the frame is skipped.
+   */
+  maxStrayFraction: 0.003,
 
   // --- grouping frames into one hit ---
   /** A hit ends once no spot has been seen for longer than this. */
@@ -29,6 +37,8 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   maxEventMs: 400,
   /** Minimum quiet time between two accepted hits. */
   cooldownMs: 120,
+  /** After movement or a lighting change, ignore spots for this long. */
+  settleMs: 100,
 });
 
 /**

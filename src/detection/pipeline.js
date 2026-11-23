@@ -12,6 +12,7 @@ export function createFlashPipeline(width, height, overrides = {}) {
   const params = { ...DEFAULT_DETECTION_PARAMS, ...overrides };
   const detector = createFrameDetector(width, height, params);
   const grouper = createEventGrouper(params);
+  let lastDisturbedT = -Infinity;
 
   const decorate = (event) => {
     if (!event) return null;
@@ -32,12 +33,24 @@ export function createFlashPipeline(width, height, overrides = {}) {
      */
     process(data, t) {
       const frame = detector.process(data);
-      const blob = frame.status === 'ok' ? frame.best : null;
+      const disturbed = frame.status === 'motion' || frame.status === 'unstable' || frame.status === 'adapting';
+      let blob = null;
+      let event;
+      if (disturbed) {
+        // A flash changes one spot and nothing else. If the scene moved or the
+        // lighting changed while a hit was forming, the hit is not trusted.
+        lastDisturbedT = t;
+        event = grouper.cancel('motion');
+      } else {
+        if (frame.status === 'ok' && t - lastDisturbedT >= params.settleMs) blob = frame.best;
+        event = grouper.push(t, blob);
+      }
       return {
         status: frame.status,
         candidateFraction: frame.candidateFraction,
+        motionFraction: frame.motionFraction,
         blob,
-        event: decorate(grouper.push(t, blob)),
+        event: decorate(event),
       };
     },
 

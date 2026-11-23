@@ -5,8 +5,9 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 //
 // push(t, blob) is called for every frame, with the frame's best spot or null.
 // It returns null, or one event:
-//   { accepted: true,  index, t, endT, durationMs, frames, x, y, peak, area }
+//   { accepted: true,  index, t, endT, durationMs, frames, x, y, peak, area, stray }
 //   { accepted: false, reason: 'cooldown' | 'persistent', ...same fields }
+// cancel(reason) discards the hit in progress (used when the scene is disturbed).
 
 /**
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]
@@ -26,6 +27,7 @@ export function createEventGrouper(overrides = {}) {
     y: ev.wy / ev.w,
     peak: ev.peak,
     area: ev.area,
+    stray: ev.stray,
   });
 
   function finish() {
@@ -54,7 +56,8 @@ export function createEventGrouper(overrides = {}) {
       }
 
       if (blob) {
-        if (!active) active = { startT: t, lastT: t, frames: 0, w: 0, wx: 0, wy: 0, peak: 0, area: 0, persistent: false };
+        if (!active) active = { startT: t, lastT: t, frames: 0, w: 0, wx: 0, wy: 0, peak: 0, area: 0, stray: 0, persistent: false };
+        if ((blob.stray ?? 0) > active.stray) active.stray = blob.stray;
         active.lastT = t;
         active.frames += 1;
         active.w += blob.strength;
@@ -71,6 +74,17 @@ export function createEventGrouper(overrides = {}) {
         out = finish() ?? out;
       }
       return out;
+    },
+
+    /**
+     * Throws away the hit in progress, if any, because the frames around it
+     * cannot be trusted. Returns the rejection, or null if nothing was active.
+     */
+    cancel(reason) {
+      if (!active) return null;
+      const ev = active;
+      active = null;
+      return ev.persistent ? null : { ...summary(ev), accepted: false, reason };
     },
 
     /** Closes any hit still in progress (for the end of a recording). */

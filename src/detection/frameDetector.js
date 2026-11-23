@@ -15,6 +15,10 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 //   'ok'       normal frame
 //   'unstable' too much of the frame changed at once (lighting or motion)
 //   'adapting' background is catching up after 'unstable' or absorb()
+//   'motion'   something is moving in view: either a changed region too big
+//              to be a dot, or a spot was found while other parts of the frame
+//              changed too. Nothing in the frame is trusted. (First seen on a
+//              real camera: a waving hand produced weak red "spots" at its edge.)
 
 /**
  * @param {number} width
@@ -26,6 +30,7 @@ export function createFrameDetector(width, height, overrides = {}) {
   const count = width * height;
   const bgRed = new Float32Array(count);
   const bgLuma = new Float32Array(count);
+  const prevLuma = new Float32Array(count);
   const score = new Float32Array(count);
   const isRed = new Uint8Array(count);
   const findBlobs = createBlobFinder(width, height);
@@ -33,7 +38,13 @@ export function createFrameDetector(width, height, overrides = {}) {
   let initialised = false;
   let fastFrames = 0;
 
-  const empty = (status, candidateFraction = 0) => ({ status, candidateFraction, blobs: [], best: null });
+  const empty = (status, candidateFraction = 0, motionFraction = 0) => ({
+    status,
+    candidateFraction,
+    motionFraction,
+    blobs: [],
+    best: null,
+  });
 
   return {
     width,
@@ -57,6 +68,7 @@ export function createFrameDetector(width, height, overrides = {}) {
           const mx = g > b ? g : b;
           bgRed[i] = r > mx ? r - mx : 0;
           bgLuma[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          prevLuma[i] = bgLuma[i];
         }
         initialised = true;
         return empty('warming');
@@ -64,6 +76,7 @@ export function createFrameDetector(width, height, overrides = {}) {
 
       const fast = fastFrames > 0;
       let candidates = 0;
+      let moving = 0;
       for (let i = 0, j = 0; i < count; i++, j += 4) {
         const r = data[j];
         const g = data[j + 1];
@@ -73,6 +86,13 @@ export function createFrameDetector(width, height, overrides = {}) {
         const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         const dRed = red - bgRed[i];
         const dLuma = luma - bgLuma[i];
+
+        // Change since the previous frame (not the background): this is what
+        // tells a moving object, which changes where it was as well as where
+        // it is, from a flash, which changes one spot.
+        const dPrev = luma - prevLuma[i];
+        prevLuma[i] = luma;
+        if (dPrev >= p.motionDelta || dPrev <= -p.motionDelta) moving += 1;
 
         let s = 0;
         let redFlag = 0;
@@ -94,24 +114,33 @@ export function createFrameDetector(width, height, overrides = {}) {
       }
 
       const candidateFraction = candidates / count;
+      const motionFraction = moving / count;
       if (fast) {
         fastFrames -= 1;
-        return empty('adapting', candidateFraction);
+        return empty('adapting', candidateFraction, motionFraction);
       }
       if (candidateFraction > p.maxCandidateFraction) {
         fastFrames = 4;
-        return empty('unstable', candidateFraction);
+        return empty('unstable', candidateFraction, motionFraction);
       }
-      if (candidates === 0) return empty('ok');
+      if (candidates === 0) return empty('ok', 0, motionFraction);
 
-      const blobs = findBlobs(score, isRed).filter(
-        (blob) => blob.area >= p.minArea && blob.area <= maxArea && blob.redArea >= 1,
-      );
+      const regions = findBlobs(score, isRed);
+      // A changed region bigger than any laser dot is an object, not a flash;
+      // nothing else in this frame is trusted either.
+      if (regions.some((blob) => blob.area > maxArea)) return empty('motion', candidateFraction, motionFraction);
+
+      const blobs = regions.filter((blob) => blob.area >= p.minArea && blob.redArea >= 1);
       let best = null;
       for (const blob of blobs) {
         if (!best || blob.strength > best.strength) best = blob;
       }
-      return { status: 'ok', candidateFraction, blobs, best };
+      if (best) {
+        // Movement elsewhere in the frame, as a share of the frame.
+        best.stray = Math.max(0, moving - best.area) / count;
+        if (best.stray > p.maxStrayFraction) return empty('motion', candidateFraction, motionFraction);
+      }
+      return { status: 'ok', candidateFraction, motionFraction, blobs, best };
     },
   };
 }
