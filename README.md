@@ -148,8 +148,12 @@ shades closed (medium brightness). Detection at 320 x 569 pixels.
   threshold of 60), one frame long, 2 to 9 pixels. Which disturbance caused them was not recorded; skin tones
   moving through view are the likely source.
 - In response the detector now skips frames where anything other than the spot itself changed, and discards a hit
-  if the scene was disturbed while it was forming. This is covered by synthetic tests but **has not been re-run on
-  the camera**. No real red flash has been shown to the camera yet.
+  if the scene was disturbed while it was forming.
+- **Retest with that change** (build `cd9f33e`, same scene, same disturbance, 2802 frames, ~47 s): **0 hits**.
+  22 frames were flagged as movement and skipped. Between-frame change was 0% of the picture at the median and
+  reached 43% at its peak (the light switch). One run, so this shows the fix works here, not how often it would
+  fail.
+- No real red flash has been shown to the camera yet.
 
 ## How detection works
 
