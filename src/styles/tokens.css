@@ -1,0 +1,34 @@
+/* LaserRange design tokens: the approved dark range-dashboard palette. */
+:root {
+  --bg: #101820;
+  --surface: #1c2934;
+  --card: #1f303b;
+  --accent: #63d4af;
+  --action: #285d51;
+  --action-pressed: #20493f;
+  --hit: #f3a65e;
+  --text: #f5f8fa;
+  --text-2: #b5c9d2;
+  /* The brief's ring colour (#536574) is only 2.3:1 on the card surface, so the
+     main ring strokes use a lighter step (3.3:1); the original stays for minor lines. */
+  --ring: #6b8092;
+  --ring-minor: #536574;
+  --danger: #ff9d9d;
+  --border: rgba(181, 201, 210, 0.14);
+  --border-strong: rgba(181, 201, 210, 0.3);
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --tap: 48px; /* minimum tap target */
+}
