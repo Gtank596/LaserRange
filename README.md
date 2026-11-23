@@ -91,11 +91,13 @@ What both runs agree on:
 - **Worker-based frame access exists.** `MediaStreamTrackProcessor` is available inside a worker (not on the main
   thread), with `VideoFrame`. Not used yet.
 
-What is still unknown: **which change removed the missed frames.** The Safari setting, the restart, not touching
-the screen, and the lighter report code all changed between the runs. This matters because the gift recipient's
-phone will have default settings. A run with the setting switched back, everything else the same, would settle it.
-If missed frames return, the options are a setup step in the user guide or reading frames in a worker, which does
-not depend on how often the screen updates.
+**Follow-up (reported verbally, no report saved):** with the Safari setting switched back to its default, a third
+run was still a steady 60 fps with no missed frames. So the setting was not the cause, and a phone with default
+Safari settings should behave the same. The missed frames in run 1 most likely came from scrolling during the run
+or from rebuilding the report on every refresh (both were removed at once, so which one is not known).
+
+Still unmeasured: whether a short flash is actually captured at 60 fps with automatic exposure. That needs the
+LED fixture.
 
 ## Unverified assumptions
 
