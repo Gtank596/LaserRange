@@ -27,6 +27,32 @@ export function analyzePixels(data) {
 }
 
 /**
+ * Copies the current video frame into a small RGBA buffer for the detector.
+ * @param {{ width?: number }} [options] working width in pixels; height follows the video aspect ratio
+ */
+export function createFrameGrabber({ width = 320 } = {}) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  return {
+    /**
+     * @param {HTMLVideoElement} video
+     * @returns {{ data: Uint8ClampedArray, width: number, height: number } | null}
+     */
+    grab(video) {
+      if (!ctx || !video.videoWidth || !video.videoHeight) return null;
+      const height = Math.max(1, Math.round((width * video.videoHeight) / video.videoWidth));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      ctx.drawImage(video, 0, 0, width, height);
+      return { data: ctx.getImageData(0, 0, width, height).data, width, height };
+    },
+  };
+}
+
+/**
  * @param {{ width?: number }} [options] working width in pixels; height follows the video aspect ratio
  */
 export function createFrameSampler({ width = 160 } = {}) {

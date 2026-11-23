@@ -1,28 +1,50 @@
 // A synthetic video source: a canvas drawn every animation frame and exposed as
-// a MediaStream. It exercises the same frame loop and telemetry as the camera
-// without needing a camera, permission, or HTTPS.
+// a MediaStream. It exercises the same frame loop, telemetry and detection as
+// the camera without needing a camera, permission, or HTTPS.
 //
 // It is a software test pattern only. A display-rate canvas says nothing about
 // how a real camera sensor captures a short laser flash.
 
 /**
- * @param {{ width?: number, height?: number, fps?: number, flashEveryMs?: number, flashMs?: number }} [options]
+ * @param {object} [options]
+ * @param {number} [options.width]
+ * @param {number} [options.height]
+ * @param {number} [options.fps]            capture rate requested from the canvas
+ * @param {number} [options.flashEveryMs]   time between flashes
+ * @param {number} [options.flashMs]        how long each flash stays lit; always drawn for at least one frame
+ * @param {number} [options.flashIntensity] 0-1 opacity of the red dot
+ * @param {number} [options.dotSize]        dot radius as a share of the shorter side
+ * @param {(flash: { index: number, t: number, x: number, y: number }) => void} [options.onFlash]
+ *   called when a flash is first drawn; t is on the performance clock, x/y are 0-1 across the frame
  * @returns {{ stream: MediaStream, stop: () => void }}
  */
-export function createSyntheticSource({ width = 640, height = 480, fps = 30, flashEveryMs = 1000, flashMs = 50 } = {}) {
+export function createSyntheticSource({
+  width = 640,
+  height = 480,
+  fps = 30,
+  flashEveryMs = 1000,
+  flashMs = 50,
+  flashIntensity = 1,
+  dotSize = 0.015,
+  onFlash,
+} = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  const started = performance.now();
+  let started = null;
   let raf = 0;
   let frame = 0;
+  let lastCycle = 0; // no flash during the first interval, so consumers can settle
+  let flash = null;
 
   const cx = width / 2;
   const cy = height / 2;
   const radius = Math.min(width, height) * 0.4;
+  const dotRadius = Math.max(2, Math.min(width, height) * dotSize);
 
   const draw = (now) => {
+    if (started === null) started = now;
     const t = now - started;
     frame += 1;
 
@@ -43,15 +65,25 @@ export function createSyntheticSource({ width = 640, height = 480, fps = 30, fla
     ctx.fillStyle = '#63d4af';
     ctx.fillRect(((t / 4) % (width + 40)) - 40, height - 10, 40, 6);
 
-    // A red dot that appears briefly at a position that changes each flash.
+    // Start a new flash on the first frame of each interval. Starting it here,
+    // rather than testing the clock, guarantees every flash is drawn at least once.
     const cycle = Math.floor(t / flashEveryMs);
-    if (t % flashEveryMs < flashMs) {
+    if (cycle > lastCycle) {
+      lastCycle = cycle;
       const angle = cycle * 2.4;
       const dist = radius * (0.15 + 0.6 * ((cycle * 0.37) % 1));
+      flash = { startedAt: t, px: cx + Math.cos(angle) * dist, py: cy + Math.sin(angle) * dist };
+      onFlash?.({ index: cycle, t: now, x: flash.px / width, y: flash.py / height });
+    }
+    if (flash && t - flash.startedAt < Math.max(flashMs, 0.001)) {
+      ctx.globalAlpha = flashIntensity;
       ctx.fillStyle = '#ff2a1a';
       ctx.beginPath();
-      ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, 7, 0, Math.PI * 2);
+      ctx.arc(flash.px, flash.py, dotRadius, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      flash = null;
     }
 
     ctx.fillStyle = '#f5f8fa';

@@ -20,7 +20,7 @@ export function sessionScreen(root) {
             <span>Camera check <small>${checked ? 'Done in this visit.' : 'Available now. Run it to see real frame timing.'}</small></span>
           </li>
           <li>${icons.circle}<span>Target calibration <small>Planned: four-corner overlay (milestone 4).</small></span></li>
-          <li>${icons.circle}<span>Flash detection <small>Planned: simulated first, then real camera frames (milestones 3 and 6).</small></span></li>
+          <li>${icons.circle}<span>Flash detection <small>Works on simulated flashes in the Detection lab. Not yet measured on a real camera (milestone 6).</small></span></li>
           <li>${icons.circle}<span>Saving sessions <small>Planned: on-device storage (milestone 7).</small></span></li>
         </ul>
       </section>

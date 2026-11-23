@@ -58,6 +58,12 @@ export function homeScreen(root) {
         ${icons.forward}
       </a>
 
+      <a class="row-link" href="#/lab">
+        ${icons.pulse}
+        <span class="row-link__text">Detection lab<small>Try flash detection on a simulated target</small></span>
+        ${icons.forward}
+      </a>
+
       ${buildFooterHtml}
     </main>`;
 
