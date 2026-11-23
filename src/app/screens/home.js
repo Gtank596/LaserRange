@@ -2,6 +2,7 @@ import { summarizeHits } from '../../calibration/scoring.js';
 import { SAMPLE_HITS } from '../../sessions/sampleData.js';
 import { icons } from '../../ui/icons.js';
 import { targetLegendHtml, targetOverlaySvg } from '../../ui/targetOverlay.js';
+import { attachBuildFooter, buildFooterHtml } from '../build.js';
 import { appState } from '../state.js';
 
 export function homeScreen(root) {
@@ -56,5 +57,9 @@ export function homeScreen(root) {
         <span class="row-link__text">Camera check<small>Measure real frame timing on this device</small></span>
         ${icons.forward}
       </a>
+
+      ${buildFooterHtml}
     </main>`;
+
+  attachBuildFooter(root);
 }

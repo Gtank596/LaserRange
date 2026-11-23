@@ -643,6 +643,36 @@ details.card[open] > summary {
   user-select: text;
 }
 
+.build-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto; /* sits at the bottom of short screens */
+  padding-top: var(--space-3);
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.link-button {
+  min-height: var(--tap);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button[disabled] {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

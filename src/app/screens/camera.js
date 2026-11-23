@@ -6,6 +6,7 @@ import { createFrameStats, summarize } from '../../camera/frameStats.js';
 import { buildConstraints, describeTrack, openCamera, stopStream } from '../../camera/stream.js';
 import { createSyntheticSource } from '../../simulation/syntheticSource.js';
 import { icons } from '../../ui/icons.js';
+import { attachBuildFooter, BUILD_ID, buildFooterHtml } from '../build.js';
 import { appState } from '../state.js';
 
 const UI_REFRESH_MS = 250; // telemetry text/graph refresh; frames are still measured individually
@@ -115,7 +116,11 @@ export function cameraScreen(root) {
           <li>The test pattern exercises the software only. It says nothing about a real camera or a real laser cartridge.</li>
         </ul>
       </details>
+
+      ${buildFooterHtml}
     </main>`;
+
+  attachBuildFooter(root);
 
   const $ = (selector) => root.querySelector(selector);
   const video = /** @type {HTMLVideoElement} */ ($('#cam-video'));
@@ -371,6 +376,7 @@ export function cameraScreen(root) {
       app: 'LaserRange',
       report: 'camera-diagnostics',
       reportVersion: 2,
+      build: BUILD_ID,
       createdAt: new Date().toISOString(),
       environment: {
         userAgent: navigator.userAgent,
