@@ -1,7 +1,7 @@
 import { checkCameraSupport, describeCameraError } from '../../camera/errors.js';
 import { startFrameLoop } from '../../camera/frameLoop.js';
 import { createFrameGrabber } from '../../camera/frameSampler.js';
-import { summarize } from '../../camera/frameStats.js';
+import { createFrameStats, summarize } from '../../camera/frameStats.js';
 import { buildConstraints, openCamera, stopStream } from '../../camera/stream.js';
 import { matchEvents } from '../../detection/matchEvents.js';
 import { confidenceWord } from '../../detection/params.js';
@@ -100,6 +100,7 @@ export function labScreen(root) {
           <div class="metric"><dt>Cost per frame</dt><dd id="r-cost">–</dd></div>
           <div class="metric"><dt>Scene</dt><dd id="r-scene">–</dd></div>
           <div class="metric"><dt>Frames analysed</dt><dd id="r-frames">–</dd></div>
+          <div class="metric metric--wide"><dt>Video delivery</dt><dd id="r-delivery">–</dd></div>
           <div class="metric metric--wide"><dt>Last hit</dt><dd id="r-last">–</dd></div>
         </dl>
       </section>
@@ -114,6 +115,7 @@ export function labScreen(root) {
         <summary>What this does and does not show</summary>
         <ul class="notes">
           <li>The test pattern is drawn by this app at the screen's refresh rate. Passing it shows the detection logic works; it says nothing about a real camera sensor or a real laser.</li>
+          <li>A test flash drawn for a single screen frame can be dropped by the test pattern's own video capture before detection ever sees it. Those count as “Missed” here even though the detector never had the frame.</li>
           <li>“Rejected” counts things seen but not reported as hits: a second flash too soon after the first, or something red that stayed in view.</li>
           <li>The camera source has no ground truth, so only detected hits are counted. Its settings are untuned guesses until measured with the LED fixture.</li>
           <li>Hit strength (weak / fair / strong) is a rough signal level, not a probability.</li>
@@ -250,10 +252,13 @@ export function labScreen(root) {
       frames: 0,
       scene: 'warming',
       costMs: [],
+      delivery: createFrameStats(),
+      patternStats: () => synthetic?.stats() ?? null,
       working: null,
       release,
       detach: () => track?.removeEventListener('ended', onEnded),
       stopLoop: startFrameLoop(video, (frame) => {
+        run.delivery.push(frame);
         const t0 = performance.now();
         const image = grabber.grab(video);
         if (!image) return;
@@ -302,15 +307,20 @@ export function labScreen(root) {
     const match = run.isSynthetic
       ? matchEvents(run.emitted, run.detected, { now: performance.now(), maxDelayMs: MATCH_WINDOW_MS })
       : null;
+    const { recentIntervalsMs: _intervals, ...delivery } = run.delivery.snapshot();
     return {
       app: 'LaserRange',
       report: 'detection-lab',
-      reportVersion: 1,
+      reportVersion: 2,
       build: BUILD_ID,
       createdAt: new Date().toISOString(),
       settings: run.settings,
       video: { width: video.videoWidth, height: video.videoHeight },
       working: run.working,
+      // How frames reached the detector: needed to tell "detector missed it"
+      // apart from "the frame never arrived".
+      delivery,
+      testPattern: run.patternStats(),
       frames: run.frames,
       detected: run.detected.length,
       rejected: run.rejected,
@@ -346,6 +356,11 @@ export function labScreen(root) {
     $('#r-cost').textContent = summary.costMs ? `${fixed(summary.costMs.mean, 2)} ms (worst ${fixed(summary.costMs.max, 1)})` : '–';
     $('#r-scene').textContent = SCENE_TEXT[run.scene] ?? run.scene;
     $('#r-frames').textContent = String(summary.frames);
+    const { observedFps, missedFrames } = summary.delivery;
+    const drawn = summary.testPattern?.drawnFps;
+    $('#r-delivery').textContent = observedFps
+      ? `${fixed(observedFps)} fps · ${missedFrames === null ? 'missed frames not reported' : `${missedFrames} missed`}${drawn ? ` · pattern drawn at ${fixed(drawn, 0)} fps` : ''}`
+      : 'measuring…';
     $('#r-last').textContent = last
       ? `#${last.index} at x ${pct(last.x)}, y ${pct(last.y)} · ${confidenceWord(last.confidence)} signal`
       : 'none yet';

@@ -97,6 +97,11 @@ export function createSyntheticSource({
   const stream = canvas.captureStream(fps);
   return {
     stream,
+    /** How fast the pattern is really being drawn (the screen's refresh rate, unless throttled). */
+    stats() {
+      const elapsedMs = started === null ? 0 : performance.now() - started;
+      return { framesDrawn: frame, drawnFps: elapsedMs > 0 ? (frame * 1000) / elapsedMs : null };
+    },
     stop() {
       cancelAnimationFrame(raf);
       stream.getTracks().forEach((track) => track.stop());

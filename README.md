@@ -102,6 +102,29 @@ or from rebuilding the report on every refresh (both were removed at once, so wh
 Still unmeasured: whether a short flash is actually captured at 60 fps with automatic exposure. That needs the
 LED fixture.
 
+### Detection lab on the iPhone (test pattern only)
+
+Five runs on Nov 23, 2026, build `b69ef11`, installed app, Normal sensitivity unless noted. Simulated flashes
+drawn by the app itself, so this checks the software path at the phone's real frame rate (about 60 fps), not a
+camera. Each run is only 14 to 23 flashes.
+
+| Test flash | Found | Missed | False hits |
+|---|---|---|---|
+| 100 ms, full strength | 15 of 15 | 0 | 0 |
+| 33 ms, full strength | 14 of 14 | 0 | 0 |
+| 1 screen frame, full strength | 11 of 15 | 4 | 0 |
+| 1 screen frame, full strength, High sensitivity | 10 of 14 | 4 | 0 |
+| 1 screen frame, 15% strength | 0 of 23 | 23 (expected: below the threshold) | 0 |
+
+- Detection plus frame copy cost **3.5 ms per frame** at 320 px wide, about a fifth of the 16.7 ms budget.
+- Position error was 0.1% of the frame.
+- Flashes spanning two or more frames were always found. A flash living in a single screen frame was missed about
+  a quarter of the time, and raising sensitivity did not help. The likely reason is that the frame never reached
+  the detector (the test pattern's own video capture can skip a frame), but those runs did not record frame
+  delivery, so that is not confirmed. Lab reports from version 2 on include delivery figures.
+- The point to carry forward: **a flash that fits inside one frame is the fragile case.** How long the real
+  cartridge's flash lasts is the number that matters most, and it is still unknown.
+
 ## How detection works
 
 Each frame is shrunk to 320 pixels wide and compared with a slowly updating memory of the scene.
