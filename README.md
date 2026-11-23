@@ -29,10 +29,18 @@ npm test           # unit tests
 npm run build      # production build into dist/
 ```
 
-## Testing on the iPhone (camera needs HTTPS)
+## Live site
+
+**https://gtank596.github.io/LaserRange/**
+
+Every push to `main` runs the tests, builds, and publishes here through GitHub Actions
+(`.github/workflows/deploy.yml`). This is the simplest way to test on the iPhone: open the address in Safari, go to
+**Camera check**, press **Start camera**, hold still for ~10 seconds, then **Copy report**.
+
+## Testing on the iPhone from the local dev server (optional)
 
 Browsers only allow camera access on `https://` pages (or `localhost`), so the phone cannot use the plain
-`http://` dev address.
+`http://` dev address. Use this route to try changes on the phone before pushing them.
 
 1. PC and iPhone on the same Wi-Fi.
 2. Run `npm run dev:https`. Vite prints one or more `Network: https://<address>:5173/` lines.
@@ -44,9 +52,8 @@ Browsers only allow camera access on `https://` pages (or `localhost`), so the p
    **Copy report** and save the text.
 
 Not yet verified on a real iPhone: that Safari grants the camera after the certificate warning is accepted. If it
-refuses, the fallback is to deploy `dist/` to any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages).
-That hosting is needed for the final gift anyway, and for the offline service worker, which requires a properly
-trusted certificate.
+refuses, use the live site above, which has a properly trusted certificate (the offline service worker will need
+that too).
 
 ### What to record from the first iPhone run
 
