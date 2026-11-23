@@ -164,6 +164,33 @@ describe('flash pipeline on synthetic frames', () => {
     });
   });
 
+  describe('with a target-area mask', () => {
+    // Watch only the left half of the frame.
+    const leftHalf = new Uint8Array(WIDTH * HEIGHT);
+    for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH / 2; x++) leftHalf[y * WIDTH + x] = 1;
+
+    const run = (flashesFor, objectsFor = () => []) => {
+      const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed: 3 });
+      const pipeline = createFlashPipeline(WIDTH, HEIGHT, {}, { mask: leftHalf });
+      const hits = [];
+      for (let i = 0; i < 80; i++) {
+        const result = pipeline.process(render({ flashes: flashesFor(i), objects: objectsFor(i) }), i * FRAME_MS);
+        if (result.event?.accepted) hits.push(result.event);
+      }
+      return hits;
+    };
+
+    it('finds a flash inside the watched area and ignores one outside it', () => {
+      expect(run((i) => (i === 30 ? [dot({ x: 0.25 })] : []))).toHaveLength(1);
+      expect(run((i) => (i === 30 ? [dot({ x: 0.75 })] : []))).toHaveLength(0);
+    });
+
+    it('is not disturbed by movement outside the watched area', () => {
+      const moving = (i) => (i >= 20 && i < 60 ? [{ x: 90 + (i - 20), y: 20, w: 30, h: 60, color: [230, 140, 120] }] : []);
+      expect(run((i) => (i === 30 ? [dot({ x: 0.25 })] : []), moving)).toHaveLength(1);
+    });
+  });
+
   it('rejects a red region far larger than a laser dot', () => {
     const { hits } = runSequence({ frames: 60, flashesFor: (i) => (i === 30 ? [dot({ radius: 20 })] : []) });
     expect(hits).toHaveLength(0);

@@ -1,3 +1,6 @@
+import { buildRoiMask, createMapper } from '../../calibration/calibration.js';
+import { scoreHit } from '../../calibration/scoring.js';
+import { calibrationFits } from '../../calibration/store.js';
 import { checkCameraSupport, describeCameraError } from '../../camera/errors.js';
 import { startFrameLoop } from '../../camera/frameLoop.js';
 import { createFrameGrabber } from '../../camera/frameSampler.js';
@@ -9,6 +12,7 @@ import { createFlashPipeline } from '../../detection/pipeline.js';
 import { createSyntheticSource } from '../../simulation/syntheticSource.js';
 import { icons } from '../../ui/icons.js';
 import { attachBuildFooter, BUILD_ID, buildFooterHtml } from '../build.js';
+import { appState } from '../state.js';
 
 const UI_REFRESH_MS = 250;
 const WORKING_WIDTH = 320; // detection runs on a downscaled copy this many pixels wide
@@ -108,6 +112,8 @@ export function labScreen(root) {
           <div class="metric"><dt>Scene</dt><dd id="r-scene">–</dd></div>
           <div class="metric"><dt>Frames analysed</dt><dd id="r-frames">–</dd></div>
           <div class="metric metric--wide"><dt>Video delivery</dt><dd id="r-delivery">–</dd></div>
+          <div class="metric metric--wide"><dt>Calibration</dt><dd id="r-calibration">–</dd></div>
+          <div class="metric metric--wide"><dt>Ring scores vs. expected (test pattern)</dt><dd id="r-scores">–</dd></div>
           <div class="metric metric--wide"><dt>Last hit</dt><dd id="r-last">–</dd></div>
         </dl>
       </section>
@@ -243,6 +249,10 @@ export function labScreen(root) {
     // Shape the preview box like the video so overlay positions line up exactly.
     preview.style.setProperty('--ar', String(video.videoWidth / video.videoHeight || 4 / 3));
 
+    // Use the saved calibration only if it was made with this source and picture size.
+    const calibration = calibrationFits(appState.calibration, source, video) ? appState.calibration : null;
+    const mapper = calibration ? createMapper(calibration) : null;
+
     const grabber = createFrameGrabber({ width: WORKING_WIDTH });
     const track = stream.getVideoTracks()[0];
     const onEnded = () => stop('ended');
@@ -254,6 +264,8 @@ export function labScreen(root) {
       isSynthetic,
       settings: { source, redDelta, flashMs: isSynthetic ? flashMs : null, flashIntensity: isSynthetic ? flashIntensity : null },
       emitted,
+      calibration: mapper ? calibration : null,
+      mapper,
       detected: [],
       rejected: 0,
       rejectedBy: { cooldown: 0, persistent: 0, motion: 0 },
@@ -273,7 +285,9 @@ export function labScreen(root) {
         const image = grabber.grab(video);
         if (!image) return;
         if (!pipeline || pipeline.width !== image.width || pipeline.height !== image.height) {
-          pipeline = createFlashPipeline(image.width, image.height, { redDelta });
+          // With a calibration, only the target area is watched.
+          const mask = mapper ? buildRoiMask(calibration.corners, image.width, image.height) : null;
+          pipeline = createFlashPipeline(image.width, image.height, { redDelta }, { mask });
           run.working = { width: image.width, height: image.height };
         }
         const result = pipeline.process(image.data, frame.now);
@@ -302,9 +316,15 @@ export function labScreen(root) {
 
   function onEvent(event) {
     if (event.accepted) {
+      let ring = '';
+      if (run.mapper) {
+        event.target = run.mapper.imageToTarget(event.x, event.y);
+        event.score = scoreHit(event.target, run.mapper.target);
+        ring = `${event.score > 0 ? `ring ${event.score}` : 'outside the rings'} · `;
+      }
       run.detected.push(event);
       addLog(
-        `#${event.index} · x ${pct(event.x)} y ${pct(event.y)} · ${event.frames} frame${event.frames === 1 ? '' : 's'} · ${fixed(event.durationMs, 0)} ms · ${confidenceWord(event.confidence)}`,
+        `#${event.index} · ${ring}x ${pct(event.x)} y ${pct(event.y)} · ${event.frames} frame${event.frames === 1 ? '' : 's'} · ${fixed(event.durationMs, 0)} ms · ${confidenceWord(event.confidence)}`,
       );
       drawOverlay(); // show the hit straight away rather than on the next refresh
     } else {
@@ -322,13 +342,40 @@ export function labScreen(root) {
       ? matchEvents(run.emitted, run.detected, { now: performance.now(), maxDelayMs: MATCH_WINDOW_MS })
       : null;
     const { recentIntervalsMs: _intervals, ...delivery } = run.delivery.snapshot();
+
+    // On the calibrated test pattern the true target position of every flash is
+    // known, so the whole chain (detect, map through the calibration, score)
+    // can be checked against it.
+    let scoreCheck = null;
+    if (match && run.mapper) {
+      let agree = 0;
+      let errorSum = 0;
+      for (const { flash, hit } of match.pairs) {
+        if (scoreHit({ x: flash.targetX, y: flash.targetY }, run.mapper.target) === hit.score) agree += 1;
+        errorSum += Math.hypot(hit.target.x - flash.targetX, hit.target.y - flash.targetY);
+      }
+      const compared = match.pairs.length;
+      scoreCheck = {
+        compared,
+        scoresAgree: agree,
+        // Mean distance between mapped and true position, as a percentage of the outer ring radius.
+        meanTargetErrorPct: compared ? (errorSum / compared) * 100 : null,
+      };
+    }
+    let groundTruth = null;
+    if (match) {
+      const { pairs: _pairs, ...counts } = match;
+      groundTruth = counts;
+    }
     return {
       app: 'LaserRange',
       report: 'detection-lab',
-      reportVersion: 3,
+      reportVersion: 4,
       build: BUILD_ID,
       createdAt: new Date().toISOString(),
       settings: run.settings,
+      calibration: run.calibration ? { inUse: true, savedAt: run.calibration.savedAt, corners: run.calibration.corners } : { inUse: false },
+      scoreCheck,
       video: { width: video.videoWidth, height: video.videoHeight },
       working: run.working,
       // Frames by scene state, and how much of the frame changed between
@@ -343,12 +390,13 @@ export function labScreen(root) {
       frames: run.frames,
       detected: run.detected.length,
       rejected: run.rejected,
-      groundTruth: match,
+      groundTruth,
       costMs: cost,
       hits: run.detected.slice(-50).map((hit) => ({
         index: hit.index,
         x: hit.x,
         y: hit.y,
+        ...(hit.target ? { targetX: hit.target.x, targetY: hit.target.y, score: hit.score } : {}),
         frames: hit.frames,
         durationMs: hit.durationMs,
         peak: hit.peak,
@@ -382,8 +430,19 @@ export function labScreen(root) {
       ? `${fixed(observedFps)} fps · ${missedFrames === null ? 'missed frames not reported' : `${missedFrames} missed`}${drawn ? ` · pattern drawn at ${fixed(drawn, 0)} fps` : ''}`
       : 'measuring…';
     $('#r-last').textContent = last
-      ? `#${last.index} at x ${pct(last.x)}, y ${pct(last.y)} · ${confidenceWord(last.confidence)} signal`
+      ? `#${last.index}${last.score !== undefined ? (last.score > 0 ? ` · ring ${last.score}` : ' · outside the rings') : ''} at x ${pct(last.x)}, y ${pct(last.y)} · ${confidenceWord(last.confidence)} signal`
       : 'none yet';
+    $('#r-calibration').textContent = run.calibration
+      ? 'In use: only the target area is watched, and hits get ring scores'
+      : appState.calibration
+        ? 'Saved one was made for a different source or picture size: not used'
+        : 'None: the whole picture is watched, no ring scores';
+    const check = summary.scoreCheck;
+    $('#r-scores').textContent = check
+      ? check.compared
+        ? `${check.scoresAgree} of ${check.compared} agree · position off by ${fixed(check.meanTargetErrorPct, 2)}% of ring radius`
+        : 'waiting for hits'
+      : 'needs the test pattern with a saved calibration';
     copyBtn.disabled = false;
     drawOverlay();
   }
@@ -401,6 +460,20 @@ export function labScreen(root) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     if (!run) return;
+
+    // The calibrated target area, when one is in use.
+    if (run.calibration) {
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(99, 212, 175, 0.8)';
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      run.calibration.corners.forEach((corner, i) =>
+        i === 0 ? ctx.moveTo(corner.x * w, corner.y * h) : ctx.lineTo(corner.x * w, corner.y * h),
+      );
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#63d4af';

@@ -18,5 +18,6 @@ export const icons = {
   forward: stroke('<path d="M9 5l7 7-7 7"/>'),
   flask: stroke('<path d="M9 3h6"/><path d="M10 3v6l-5.2 9a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9V3"/><path d="M7.5 15h9"/>'),
   copy: stroke('<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V6.5a2 2 0 0 1 2-2h8.5"/>'),
+  target: stroke('<circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>'),
   pulse: stroke('<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>'),
 };

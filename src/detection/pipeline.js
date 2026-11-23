@@ -7,10 +7,11 @@ import { DEFAULT_DETECTION_PARAMS, hitConfidence } from './params.js';
  * @param {number} width  working image width in pixels
  * @param {number} height working image height in pixels
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]
+ * @param {{ mask?: Uint8Array | null }} [options] see createFrameDetector
  */
-export function createFlashPipeline(width, height, overrides = {}) {
+export function createFlashPipeline(width, height, overrides = {}, options = {}) {
   const params = { ...DEFAULT_DETECTION_PARAMS, ...overrides };
-  const detector = createFrameDetector(width, height, params);
+  const detector = createFrameDetector(width, height, params, options);
   const grouper = createEventGrouper(params);
   let lastDisturbedT = -Infinity;
 

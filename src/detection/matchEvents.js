@@ -18,6 +18,7 @@ export function matchEvents(emitted, detected, { now = Infinity, maxDelayMs = 80
   let pending = 0;
   let errorSum = 0;
   let maxError = 0;
+  const pairs = [];
 
   for (const flash of emitted) {
     let found = -1;
@@ -36,6 +37,7 @@ export function matchEvents(emitted, detected, { now = Infinity, maxDelayMs = 80
     }
     if (found >= 0) {
       used[found] = true;
+      pairs.push({ flash, hit: detected[found] });
       matched += 1;
       errorSum += foundError;
       if (foundError > maxError) maxError = foundError;
@@ -55,5 +57,7 @@ export function matchEvents(emitted, detected, { now = Infinity, maxDelayMs = 80
     extra: used.filter((flag) => !flag).length,
     meanError: matched ? errorSum / matched : null,
     maxError: matched ? maxError : null,
+    /** The matched flash/detection pairs, for comparing anything else about them. */
+    pairs,
   };
 }

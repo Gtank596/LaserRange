@@ -43,7 +43,11 @@ export function homeScreen(root) {
         ${targetLegendHtml}
         <ul class="readiness" aria-label="Readiness">
           ${cameraChip}
-          <li class="chip">${icons.circle}Not calibrated</li>
+          ${
+            appState.calibration
+              ? `<li class="chip chip--ok">${icons.check}Calibration saved</li>`
+              : `<li class="chip">${icons.circle}Not calibrated</li>`
+          }
         </ul>
       </section>
 
@@ -51,6 +55,12 @@ export function homeScreen(root) {
         <a class="btn btn--primary" href="#/session">${icons.play}Start session</a>
         <a class="btn btn--secondary" href="#/history">${icons.clock}History</a>
       </nav>
+
+      <a class="row-link" href="#/calibrate">
+        ${icons.target}
+        <span class="row-link__text">Calibrate target<small>Line up the printed square so hits can be scored</small></span>
+        ${icons.forward}
+      </a>
 
       <a class="row-link" href="#/camera">
         ${icons.camera}

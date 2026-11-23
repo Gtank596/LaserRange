@@ -24,15 +24,20 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
  * @param {number} width
  * @param {number} height
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]
+ * @param {{ mask?: Uint8Array | null }} [options] mask: 1 for pixels to watch (the calibrated
+ *   target area), 0 to ignore. Everything outside is invisible to detection, including movement.
  */
-export function createFrameDetector(width, height, overrides = {}) {
+export function createFrameDetector(width, height, overrides = {}, { mask = null } = {}) {
   const p = { ...DEFAULT_DETECTION_PARAMS, ...overrides };
-  const count = width * height;
-  const bgRed = new Float32Array(count);
-  const bgLuma = new Float32Array(count);
-  const prevLuma = new Float32Array(count);
-  const score = new Float32Array(count);
-  const isRed = new Uint8Array(count);
+  const pixels = width * height;
+  if (mask && mask.length !== pixels) throw new Error(`Mask must have ${pixels} entries, got ${mask.length}`);
+  // Shares of "the frame" are measured against the watched area.
+  const count = mask ? Math.max(1, mask.reduce((sum, value) => sum + value, 0)) : pixels;
+  const bgRed = new Float32Array(pixels);
+  const bgLuma = new Float32Array(pixels);
+  const prevLuma = new Float32Array(pixels);
+  const score = new Float32Array(pixels);
+  const isRed = new Uint8Array(pixels);
   const findBlobs = createBlobFinder(width, height);
   const maxArea = Math.max(p.minArea, Math.floor(count * p.maxAreaFraction));
   let initialised = false;
@@ -58,10 +63,10 @@ export function createFrameDetector(width, height, overrides = {}) {
 
     /** @param {Uint8ClampedArray | Uint8Array} data RGBA pixels, width * height * 4 */
     process(data) {
-      if (data.length !== count * 4) throw new Error(`Expected ${count * 4} bytes, got ${data.length}`);
+      if (data.length !== pixels * 4) throw new Error(`Expected ${pixels * 4} bytes, got ${data.length}`);
 
       if (!initialised) {
-        for (let i = 0, j = 0; i < count; i++, j += 4) {
+        for (let i = 0, j = 0; i < pixels; i++, j += 4) {
           const r = data[j];
           const g = data[j + 1];
           const b = data[j + 2];
@@ -77,7 +82,11 @@ export function createFrameDetector(width, height, overrides = {}) {
       const fast = fastFrames > 0;
       let candidates = 0;
       let moving = 0;
-      for (let i = 0, j = 0; i < count; i++, j += 4) {
+      for (let i = 0, j = 0; i < pixels; i++, j += 4) {
+        if (mask !== null && mask[i] === 0) {
+          score[i] = 0;
+          continue;
+        }
         const r = data[j];
         const g = data[j + 1];
         const b = data[j + 2];

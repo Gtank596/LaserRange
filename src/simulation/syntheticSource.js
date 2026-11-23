@@ -5,6 +5,8 @@
 // It is a software test pattern only. A display-rate canvas says nothing about
 // how a real camera sensor captures a short laser flash.
 
+import { getTarget, ringShare } from '../calibration/targets.js';
+
 /**
  * @param {object} [options]
  * @param {number} [options.width]
@@ -16,7 +18,7 @@
  * @param {number} [options.dotSize]        dot radius as a share of the shorter side
  * @param {(flash: { index: number, t: number, x: number, y: number }) => void} [options.onFlash]
  *   called when a flash is first drawn; t is on the performance clock, x/y are 0-1 across the frame
- * @returns {{ stream: MediaStream, stop: () => void }}
+ * @returns {{ stream: MediaStream, corners: { x: number, y: number }[], stats: () => object, stop: () => void }}
  */
 export function createSyntheticSource({
   width = 640,
@@ -38,10 +40,20 @@ export function createSyntheticSource({
   let lastCycle = 0; // no flash during the first interval, so consumers can settle
   let flash = null;
 
+  // The drawn "paper" follows the real printed target's proportions, so the
+  // calibration screen can be tried on it: a square with the rings inside.
+  const target = getTarget();
   const cx = width / 2;
   const cy = height / 2;
-  const radius = Math.min(width, height) * 0.4;
+  const radius = Math.min(width, height) * 0.4; // outer ring
+  const halfSide = radius / ringShare(target); // half the square's side
   const dotRadius = Math.max(2, Math.min(width, height) * dotSize);
+  const corners = [
+    { x: (cx - halfSide) / width, y: (cy - halfSide) / height },
+    { x: (cx + halfSide) / width, y: (cy - halfSide) / height },
+    { x: (cx + halfSide) / width, y: (cy + halfSide) / height },
+    { x: (cx - halfSide) / width, y: (cy + halfSide) / height },
+  ];
 
   const draw = (now) => {
     if (started === null) started = now;
@@ -52,12 +64,14 @@ export function createSyntheticSource({
     ctx.fillRect(0, 0, width, height);
 
     ctx.fillStyle = '#d9dfe3'; // "paper"
-    ctx.fillRect(cx - radius * 1.15, cy - radius * 1.15, radius * 2.3, radius * 2.3);
+    ctx.fillRect(cx - halfSide, cy - halfSide, halfSide * 2, halfSide * 2);
     ctx.strokeStyle = '#3a4650';
-    ctx.lineWidth = 2;
-    for (let i = 1; i <= 5; i++) {
+    ctx.lineWidth = 3;
+    ctx.strokeRect(cx - halfSide, cy - halfSide, halfSide * 2, halfSide * 2);
+    for (let i = 1; i <= target.ringCount; i++) {
+      ctx.lineWidth = i % 2 === 0 ? 2 : 1;
       ctx.beginPath();
-      ctx.arc(cx, cy, (radius * i) / 5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, (radius * i) / target.ringCount, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -73,7 +87,15 @@ export function createSyntheticSource({
       const angle = cycle * 2.4;
       const dist = radius * (0.15 + 0.6 * ((cycle * 0.37) % 1));
       flash = { startedAt: t, px: cx + Math.cos(angle) * dist, py: cy + Math.sin(angle) * dist };
-      onFlash?.({ index: cycle, t: now, x: flash.px / width, y: flash.py / height });
+      onFlash?.({
+        index: cycle,
+        t: now,
+        x: flash.px / width,
+        y: flash.py / height,
+        // The same position in target coordinates (1 = outer ring radius).
+        targetX: (flash.px - cx) / radius,
+        targetY: (flash.py - cy) / radius,
+      });
     }
     if (flash && t - flash.startedAt < Math.max(flashMs, 0.001)) {
       ctx.globalAlpha = flashIntensity;
@@ -97,6 +119,8 @@ export function createSyntheticSource({
   const stream = canvas.captureStream(fps);
   return {
     stream,
+    /** Where the drawn square's corners are (0-1 of the frame): top-left, then clockwise. */
+    corners,
     /** How fast the pattern is really being drawn (the screen's refresh rate, unless throttled). */
     stats() {
       const elapsedMs = started === null ? 0 : performance.now() - started;
