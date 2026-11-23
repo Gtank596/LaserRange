@@ -67,22 +67,35 @@ Run the camera check in **both** a Safari tab and the installed home-screen app,
 
 ## Measured so far
 
-One run on Nov 23, 2026: iPhone, installed home-screen app, rear camera, 120 fps requested, 160 px analysis,
-236 frames (about 4.5 seconds). A single short run, so treat these as first readings, not settled facts.
+Two short runs on Nov 23, 2026, both on the iPhone in the installed home-screen app, rear camera, 120 fps
+requested. Two runs is thin evidence: treat these as first readings, not settled facts.
 
-| Question | Reading |
-|---|---|
-| Highest frame rate offered | **60 fps.** The camera's reported `frameRate` capability tops out at 60; the 120 request was delivered as 60. |
-| Observed rate | 52 fps. Most intervals were 16-17 ms, with about one in seven doubled to ~33 ms. |
-| Frames missed | 34 of ~270 presented frames (about 13%) never reached the frame callback. |
-| Analysis cost | 7.2 ms mean per frame at 160 px wide, out of a 16.7 ms budget at 60 fps. |
-| Exposure control | **None exposed.** Capabilities list focus distance, torch, white balance mode and zoom, but no exposure mode, exposure time or ISO. |
-| Media-clock timestamps | Not usable: the video's media time did not advance, so timing relies on callback timestamps, which Safari rounds to whole milliseconds. |
+| | Run 1 | Run 2 |
+|---|---|---|
+| Conditions | Default Safari settings; 160 px analysis; report rebuilt every refresh; screen was scrolled during the run | After changing a Safari frame-rate setting and restarting the phone; 640 px analysis; build `b596ed9` |
+| Frames measured | 236 (~4.5 s) | 511 (~8.5 s) |
+| Camera's maximum frame rate | 60 | 60 |
+| Observed rate | 52 fps | 59.99 fps |
+| Frames missed | 34 of ~270 (13%) | **0** |
+| Late frames (interval > 1.5x median) | 33 | 0 |
+| Analysis cost per frame | 7.2 ms at 160 px | 7.0 ms at 640 px (copy in 1.5, read back 4.6, maths 1.0) |
 
-What is still unknown: why frames were missed (our own analysis and screen updates, or Safari itself) and where
-the 7 ms goes. The **Pixel analysis** switch (Off / 160 / 320 / 640 px) and the copy-in / read / maths breakdown
-in the camera check exist to answer that. The report also lists whether worker-based frame access
-(`MediaStreamTrackProcessor`, `VideoFrame`) exists on the device.
+What both runs agree on:
+
+- **60 fps is the camera's ceiling in Safari.** `capabilities.frameRate.max` is 60 in both; a 120 request is
+  delivered as 60. The Safari settings change did not move this.
+- **No exposure control is exposed.** Capabilities list focus distance, torch, white balance mode and zoom, but no
+  exposure mode, exposure time or ISO.
+- **Media-clock timestamps are not usable.** Media time did not advance, so timing relies on callback timestamps,
+  which Safari rounds to whole milliseconds.
+- **Worker-based frame access exists.** `MediaStreamTrackProcessor` is available inside a worker (not on the main
+  thread), with `VideoFrame`. Not used yet.
+
+What is still unknown: **which change removed the missed frames.** The Safari setting, the restart, not touching
+the screen, and the lighter report code all changed between the runs. This matters because the gift recipient's
+phone will have default settings. A run with the setting switched back, everything else the same, would settle it.
+If missed frames return, the options are a setup step in the user guide or reading frames in a worker, which does
+not depend on how often the screen updates.
 
 ## Unverified assumptions
 
