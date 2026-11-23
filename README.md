@@ -65,9 +65,29 @@ Run the camera check in **both** a Safari tab and the installed home-screen app,
 - Are there long frame intervals or missed frames while the phone sits still?
 - Does anything differ between the Safari tab and the installed app?
 
+## Measured so far
+
+One run on Nov 23, 2026: iPhone, installed home-screen app, rear camera, 120 fps requested, 160 px analysis,
+236 frames (about 4.5 seconds). A single short run, so treat these as first readings, not settled facts.
+
+| Question | Reading |
+|---|---|
+| Highest frame rate offered | **60 fps.** The camera's reported `frameRate` capability tops out at 60; the 120 request was delivered as 60. |
+| Observed rate | 52 fps. Most intervals were 16-17 ms, with about one in seven doubled to ~33 ms. |
+| Frames missed | 34 of ~270 presented frames (about 13%) never reached the frame callback. |
+| Analysis cost | 7.2 ms mean per frame at 160 px wide, out of a 16.7 ms budget at 60 fps. |
+| Exposure control | **None exposed.** Capabilities list focus distance, torch, white balance mode and zoom, but no exposure mode, exposure time or ISO. |
+| Media-clock timestamps | Not usable: the video's media time did not advance, so timing relies on callback timestamps, which Safari rounds to whole milliseconds. |
+
+What is still unknown: why frames were missed (our own analysis and screen updates, or Safari itself) and where
+the 7 ms goes. The **Pixel analysis** switch (Off / 160 / 320 / 640 px) and the copy-in / read / maths breakdown
+in the camera check exist to answer that. The report also lists whether worker-based frame access
+(`MediaStreamTrackProcessor`, `VideoFrame`) exists on the device.
+
 ## Unverified assumptions
 
-- **Frame rate.** 60 or 120 fps in Safari is not guaranteed on the iPhone 15 Pro. Requested values are hints.
+- **Frame rate.** Requested values are hints. 120 fps was not available in the one run so far (see above); a Safari
+  tab has not been measured separately from the installed app.
 - **Flash capture.** Frame timing says when frames reach the page, not how long the sensor exposed each frame.
   Whether a short flash is caught depends on exposure and rolling-shutter timing, which the page may not be able
   to read or control. This has to be measured with the LED fixture, not inferred from frame rate.
@@ -87,7 +107,7 @@ scripts/make-icons.mjs  dependency-free icon generator: npm run icons
 src/
   main.js               entry: routes -> screens
   app/                  router, shared state, screens (home, camera, placeholders)
-  camera/               stream, frame loop, frame statistics, pixel sampler, error messages
+  camera/               stream, frame loop, frame statistics, pixel sampler, feature probe, error messages
   calibration/          ring scoring (homography arrives in milestone 4)
   sessions/             sample data (real sessions arrive in milestone 7)
   simulation/           synthetic test-pattern source

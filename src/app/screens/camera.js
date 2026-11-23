@@ -1,7 +1,8 @@
 import { checkCameraSupport, describeCameraError } from '../../camera/errors.js';
+import { probeMainThreadFeatures, probeWorkerFeatures } from '../../camera/features.js';
 import { frameLoopMethod, startFrameLoop } from '../../camera/frameLoop.js';
 import { createFrameSampler } from '../../camera/frameSampler.js';
-import { createFrameStats } from '../../camera/frameStats.js';
+import { createFrameStats, summarize } from '../../camera/frameStats.js';
 import { buildConstraints, describeTrack, openCamera, stopStream } from '../../camera/stream.js';
 import { createSyntheticSource } from '../../simulation/syntheticSource.js';
 import { icons } from '../../ui/icons.js';
@@ -40,14 +41,23 @@ export function cameraScreen(root) {
           <select id="cam-source">
             <option value="environment">Rear camera</option>
             <option value="user">Front camera</option>
-            <option value="synthetic">Test pattern (no camera)</option>
+            <option value="synthetic">Test pattern</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="cam-analysis">Pixel analysis</label>
+          <select id="cam-analysis">
+            <option value="160">160 px wide</option>
+            <option value="0">Off (timing only)</option>
+            <option value="320">320 px wide</option>
+            <option value="640">640 px wide</option>
           </select>
         </div>
         <div class="field">
           <label for="cam-fps">Requested rate</label>
           <select id="cam-fps">
-            <option value="30">30 fps</option>
             <option value="60">60 fps</option>
+            <option value="30">30 fps</option>
             <option value="120">120 fps</option>
           </select>
         </div>
@@ -69,10 +79,10 @@ export function cameraScreen(root) {
           <div class="metric"><dt>Observed frame rate</dt><dd id="m-fps">–</dd></div>
           <div class="metric"><dt>Browser reports</dt><dd id="m-track">–</dd></div>
           <div class="metric metric--wide"><dt>Frame interval (mean · 95th pct · worst)</dt><dd id="m-interval">–</dd></div>
-          <div class="metric"><dt>Media-clock interval</dt><dd id="m-media">–</dd></div>
-          <div class="metric"><dt>Processing per frame</dt><dd id="m-process">–</dd></div>
           <div class="metric"><dt>Frames seen</dt><dd id="m-frames">–</dd></div>
           <div class="metric"><dt>Frames missed</dt><dd id="m-missed">–</dd></div>
+          <div class="metric"><dt>Analysis per frame</dt><dd id="m-process">–</dd></div>
+          <div class="metric"><dt>Copy in · read · maths</dt><dd id="m-breakdown">–</dd></div>
           <div class="metric"><dt>Brightness (0–255)</dt><dd id="m-luma">–</dd></div>
           <div class="metric"><dt>Peak redness, recent</dt><dd id="m-red">–</dd></div>
         </dl>
@@ -100,6 +110,7 @@ export function cameraScreen(root) {
           <li>Requested rate and size are only hints. The browser may deliver less; trust “Observed”, not “Requested”.</li>
           <li>Frame intervals show when frames reach this page. They do not show how long the sensor was exposing, so they cannot by themselves say whether a very short flash would be captured.</li>
           <li>iOS controls exposure automatically. Lighting may change how reliably brief flashes are caught; that has to be measured with the LED fixture.</li>
+          <li>Some browsers round timestamps to whole milliseconds, so small timings are approximate.</li>
           <li>The installed home-screen app can behave differently from a Safari tab. Check both.</li>
           <li>The test pattern exercises the software only. It says nothing about a real camera or a real laser cartridge.</li>
         </ul>
@@ -113,16 +124,21 @@ export function cameraScreen(root) {
   const copyBtn = $('#cam-copy');
   const copyLabel = $('#cam-copy-label');
   const reportEl = $('#cam-report');
+  const reportDetails = $('#cam-report-details');
   const badge = $('#cam-badge');
   const placeholder = $('#cam-placeholder');
   const graph = /** @type {HTMLCanvasElement} */ ($('#cam-graph'));
-  const selects = [$('#cam-source'), $('#cam-fps'), $('#cam-res')];
+  const selects = [$('#cam-source'), $('#cam-analysis'), $('#cam-fps'), $('#cam-res')];
 
   let disposed = false;
   let starting = false;
   /** @type {null | Record<string, any>} */
   let run = null;
   let copyTimer = 0;
+
+  // Which frame-access APIs exist here (main thread now, worker asynchronously).
+  const features = { mainThread: probeMainThreadFeatures(), worker: null };
+  probeWorkerFeatures().then((result) => (features.worker = result));
 
   function setStatus(kind, title, detail = '') {
     const icon = kind === 'ok' ? icons.check : kind === 'error' ? icons.alert : icons.info;
@@ -153,6 +169,7 @@ export function cameraScreen(root) {
   async function start() {
     if (run || starting) return;
     const source = $('#cam-source').value;
+    const analysisWidth = Number($('#cam-analysis').value);
     const frameRate = Number($('#cam-fps').value);
     const [width, height] = $('#cam-res').value.split('x').map(Number);
     const isSynthetic = source === 'synthetic';
@@ -199,27 +216,40 @@ export function cameraScreen(root) {
     if (disposed) return release();
 
     const stats = createFrameStats();
-    const sampler = createFrameSampler();
+    // Analysis "Off" measures frame delivery alone, to separate what the
+    // browser does from what our own per-frame work costs.
+    const sampler = analysisWidth > 0 ? createFrameSampler({ width: analysisWidth }) : null;
     const recentRedness = [];
+    const breakdown = { frames: 0, drawMs: 0, readMs: 0, analyzeMs: 0 };
     const track = stream.getVideoTracks()[0];
     const onEnded = () => stop('ended');
     track?.addEventListener('ended', onEnded);
 
     run = {
       isSynthetic,
-      requested: { source, frameRate, width, height },
+      requested: { source, frameRate, width, height, analysisWidth },
       stats,
       pixels: null,
       recentRedness,
+      breakdown,
+      uiRefreshMs: [],
       trackInfo: describeTrack(stream, { includeLabel: !isSynthetic }),
       release,
       detach: () => track?.removeEventListener('ended', onEnded),
       stopLoop: startFrameLoop(video, (frame) => {
+        if (!sampler) {
+          stats.push(frame);
+          return;
+        }
         const t0 = performance.now();
         const sample = sampler.sample(video);
         const processMs = performance.now() - t0;
         if (sample) {
           run.pixels = sample;
+          breakdown.frames += 1;
+          breakdown.drawMs += sample.timing.drawMs;
+          breakdown.readMs += sample.timing.readMs;
+          breakdown.analyzeMs += sample.timing.analyzeMs;
           recentRedness.push(sample.peakRedness);
           if (recentRedness.length > REDNESS_WINDOW) recentRedness.shift();
         }
@@ -243,6 +273,7 @@ export function cameraScreen(root) {
   function stop(reason) {
     if (!run) return;
     refresh(); // capture the final numbers before tearing down
+    writeReport();
     window.clearInterval(run.timer);
     run.stopLoop();
     run.detach();
@@ -262,11 +293,21 @@ export function cameraScreen(root) {
     renderToggle();
   }
 
+  function breakdownMeans() {
+    const { frames, drawMs, readMs, analyzeMs } = run.breakdown;
+    if (!frames) return null;
+    return { drawMs: drawMs / frames, readMs: readMs / frames, analyzeMs: analyzeMs / frames };
+  }
+
+  /** Updates the on-screen numbers. Kept light: it runs while frames are being measured. */
   function refresh() {
     if (!run) return;
+    const started = performance.now();
     const snap = run.stats.snapshot();
     const settings = run.trackInfo?.settings ?? {};
     const interval = snap.callbackIntervalMs;
+    const parts = breakdownMeans();
+    const analysisOff = run.requested.analysisWidth === 0;
 
     $('#m-fps').textContent = snap.observedFps ? `${fixed(snap.observedFps)} fps` : 'measuring…';
     $('#m-track').textContent = video.videoWidth
@@ -275,40 +316,28 @@ export function cameraScreen(root) {
     $('#m-interval').textContent = interval
       ? `${fixed(interval.mean)} · ${fixed(interval.p95)} · ${fixed(interval.max)} ms`
       : 'measuring…';
-    $('#m-media').textContent = snap.mediaIntervalMs ? `${fixed(snap.mediaIntervalMs.mean)} ms` : 'not reported';
-    $('#m-process').textContent = snap.processMs
-      ? `${fixed(snap.processMs.mean, 2)} ms (worst ${fixed(snap.processMs.max, 1)})`
-      : '–';
     $('#m-frames').textContent = String(snap.frames);
     $('#m-missed').textContent = snap.missedFrames === null ? 'not reported' : String(snap.missedFrames);
+    $('#m-process').textContent = analysisOff
+      ? 'off'
+      : snap.processMs
+        ? `${fixed(snap.processMs.mean, 2)} ms (worst ${fixed(snap.processMs.max, 1)})`
+        : '–';
+    $('#m-breakdown').textContent = analysisOff
+      ? 'off'
+      : parts
+        ? `${fixed(parts.drawMs, 2)} · ${fixed(parts.readMs, 2)} · ${fixed(parts.analyzeMs, 2)} ms`
+        : '–';
     const peakRed = run.recentRedness.length ? Math.max(...run.recentRedness) : null;
-    $('#m-luma').textContent = run.pixels ? `${fixed(run.pixels.meanLuma, 0)} · ${brightnessWord(run.pixels.meanLuma)}` : '–';
-    $('#m-red').textContent = peakRed === null ? '–' : `${fixed(peakRed, 0)} / 255`;
+    $('#m-luma').textContent = analysisOff
+      ? 'off'
+      : run.pixels
+        ? `${fixed(run.pixels.meanLuma, 0)} · ${brightnessWord(run.pixels.meanLuma)}`
+        : '–';
+    $('#m-red').textContent = analysisOff ? 'off' : peakRed === null ? '–' : `${fixed(peakRed, 0)} / 255`;
     badge.textContent = snap.observedFps ? `${fixed(snap.observedFps)} fps observed` : 'measuring…';
 
     drawGraph(snap.recentIntervalsMs);
-
-    const { recentIntervalsMs, ...timing } = snap;
-    const report = {
-      app: 'LaserRange',
-      report: 'camera-diagnostics',
-      reportVersion: 1,
-      createdAt: new Date().toISOString(),
-      environment: {
-        userAgent: navigator.userAgent,
-        secureContext: window.isSecureContext,
-        installedStandalone: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
-        devicePixelRatio: window.devicePixelRatio,
-        frameCallback: frameLoopMethod(),
-      },
-      requested: run.requested,
-      track: run.trackInfo,
-      video: { width: video.videoWidth, height: video.videoHeight },
-      timing,
-      image: run.pixels ? { ...run.pixels, peakRednessRecent: peakRed } : null,
-      recentIntervalsMs,
-    };
-    reportEl.textContent = JSON.stringify(report, (_, value) => (typeof value === 'number' ? Math.round(value * 100) / 100 : value), 2);
     copyBtn.disabled = false;
 
     if (!run.isSynthetic && snap.frames > 0) {
@@ -317,9 +346,52 @@ export function cameraScreen(root) {
         observedFps: snap.observedFps,
         width: video.videoWidth,
         height: video.videoHeight,
-        at: report.createdAt,
+        at: new Date().toISOString(),
       };
     }
+
+    run.uiRefreshMs.push(performance.now() - started);
+    if (run.uiRefreshMs.length > 240) run.uiRefreshMs.shift();
+  }
+
+  /**
+   * Builds the report text. Only called on demand (stop, copy, or opening the
+   * report) so that serialising it never competes with frame delivery.
+   */
+  function writeReport() {
+    if (!run) return; // after stopping, the last report stays as it was
+    const { recentIntervalsMs, ...timing } = run.stats.snapshot();
+    const peakRed = run.recentRedness.length ? Math.max(...run.recentRedness) : null;
+    let image = null;
+    if (run.pixels) {
+      const { timing: _lastFrameTiming, ...pixelStats } = run.pixels;
+      image = { ...pixelStats, peakRednessRecent: peakRed };
+    }
+    const report = {
+      app: 'LaserRange',
+      report: 'camera-diagnostics',
+      reportVersion: 2,
+      createdAt: new Date().toISOString(),
+      environment: {
+        userAgent: navigator.userAgent,
+        secureContext: window.isSecureContext,
+        installedStandalone: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
+        devicePixelRatio: window.devicePixelRatio,
+        frameCallback: frameLoopMethod(),
+        features,
+      },
+      requested: run.requested,
+      track: run.trackInfo,
+      video: { width: video.videoWidth, height: video.videoHeight },
+      timing: {
+        ...timing,
+        analysisBreakdownMs: breakdownMeans(),
+        uiRefreshMs: summarize(run.uiRefreshMs),
+      },
+      image,
+      recentIntervalsMs,
+    };
+    reportEl.textContent = JSON.stringify(report, (_, value) => (typeof value === 'number' ? Math.round(value * 100) / 100 : value), 2);
   }
 
   function drawGraph(intervals) {
@@ -363,12 +435,13 @@ export function cameraScreen(root) {
   }
 
   async function copyReport() {
+    writeReport();
     let message = 'Copied';
     try {
       await navigator.clipboard.writeText(reportEl.textContent);
     } catch {
       // Clipboard can be blocked (permissions, insecure context): show the text instead.
-      $('#cam-report-details').open = true;
+      reportDetails.open = true;
       const range = document.createRange();
       range.selectNodeContents(reportEl);
       const selection = window.getSelection();
@@ -387,6 +460,9 @@ export function cameraScreen(root) {
 
   toggleBtn.addEventListener('click', () => (run ? stop('user') : start()));
   copyBtn.addEventListener('click', copyReport);
+  reportDetails.addEventListener('toggle', () => {
+    if (reportDetails.open) writeReport();
+  });
   document.addEventListener('visibilitychange', onVisibility);
 
   const support = cameraSupport();

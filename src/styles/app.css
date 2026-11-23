@@ -538,10 +538,6 @@ h1:focus {
   gap: var(--space-3);
 }
 
-.field:first-child {
-  grid-column: 1 / -1; /* the source picker has the longest labels */
-}
-
 .field {
   display: flex;
   flex-direction: column;

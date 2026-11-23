@@ -42,8 +42,21 @@ export function createFrameSampler({ width = 160 } = {}) {
         canvas.width = width;
         canvas.height = height;
       }
+      // Timed in three parts so we can see where the per-frame cost goes:
+      // copying the video frame in, reading pixels back, and our own maths.
+      const t0 = performance.now();
       ctx.drawImage(video, 0, 0, width, height);
-      return analyzePixels(ctx.getImageData(0, 0, width, height).data);
+      const t1 = performance.now();
+      const { data } = ctx.getImageData(0, 0, width, height);
+      const t2 = performance.now();
+      const stats = analyzePixels(data);
+      const t3 = performance.now();
+      return {
+        ...stats,
+        width,
+        height,
+        timing: { drawMs: t1 - t0, readMs: t2 - t1, analyzeMs: t3 - t2 },
+      };
     },
   };
 }
