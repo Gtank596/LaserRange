@@ -30,12 +30,27 @@ const SCENE_TEXT = {
   unstable: 'Too much change',
   adapting: 'Settling',
   motion: 'Movement in view',
+  large: 'Lit area too big for a dot',
 };
 
 const REJECTION_TEXT = {
   cooldown: 'too soon after the previous hit',
   persistent: 'stayed lit too long to be a flash',
   motion: 'something else moved or the light changed',
+  large: 'the lit area grew too big to be a dot',
+};
+
+// Stretches of frames the detector refused to trust, by cause.
+const IGNORED_TEXT = {
+  large: 'lit area too big to be a dot',
+  motion: 'movement in view',
+  unstable: 'too much of the picture changed',
+};
+
+// "Large" is for a bare LED, which lights up its surroundings as well as itself.
+const DOT_LIMITS = {
+  normal: { maxAreaFraction: 0.01, maxCandidateFraction: 0.03 },
+  large: { maxAreaFraction: 0.05, maxCandidateFraction: 0.1 },
 };
 
 export function labScreen(root) {
@@ -62,7 +77,7 @@ export function labScreen(root) {
           <label for="lab-source">Source</label>
           <select id="lab-source">
             <option value="synthetic">Test pattern</option>
-            <option value="environment">Rear camera (untested)</option>
+            <option value="environment">Rear camera</option>
           </select>
         </div>
         <div class="field">
@@ -91,6 +106,13 @@ export function labScreen(root) {
             <option value="0.15">15%</option>
           </select>
         </div>
+        <div class="field">
+          <label for="lab-dot">Dot size limit</label>
+          <select id="lab-dot">
+            <option value="normal">Normal (1% of view)</option>
+            <option value="large">Large (5% of view)</option>
+          </select>
+        </div>
       </div>
 
       <button class="btn btn--primary btn--block" id="lab-toggle" type="button"></button>
@@ -111,6 +133,7 @@ export function labScreen(root) {
           <div class="metric"><dt>Cost per frame</dt><dd id="r-cost">–</dd></div>
           <div class="metric"><dt>Scene</dt><dd id="r-scene">–</dd></div>
           <div class="metric"><dt>Frames analysed</dt><dd id="r-frames">–</dd></div>
+          <div class="metric metric--wide"><dt>Ignored (video not trusted)</dt><dd id="r-ignored">–</dd></div>
           <div class="metric metric--wide"><dt>Video delivery</dt><dd id="r-delivery">–</dd></div>
           <div class="metric metric--wide"><dt>Calibration</dt><dd id="r-calibration">–</dd></div>
           <div class="metric metric--wide"><dt>Ring scores vs. expected (test pattern)</dt><dd id="r-scores">–</dd></div>
@@ -130,7 +153,9 @@ export function labScreen(root) {
           <li>The test pattern is drawn by this app at the screen's refresh rate. Passing it shows the detection logic works; it says nothing about a real camera sensor or a real laser.</li>
           <li>The shortest test flash is one video frame (about 17 ms). On a 120 Hz screen anything shorter is drawn and gone between two video frames, so it would never reach detection at all.</li>
           <li>“Rejected” counts things seen but not reported as hits: a second flash too soon after the first, something red that stayed in view, or a spot seen while other things were moving or the light was changing.</li>
-          <li>The camera source has no ground truth, so only detected hits are counted. Its settings are untuned guesses until measured with the LED fixture.</li>
+          <li>“Ignored” counts stretches of video the detector did not trust at all: something lit up more of the view than a dot would, something was moving, or the whole picture changed.</li>
+          <li>Dot size limit “Large” is for testing with a bare LED, which lights up whatever is around it. A laser dot on paper has not been measured yet, so the normal limit is still a guess.</li>
+          <li>The camera source has no ground truth, so only detected hits are counted. Compare the count with the number of flashes your test light sent.</li>
           <li>Hit strength (weak / fair / strong) is a rough signal level, not a probability.</li>
           <li>Nothing here checks or implies that a firearm is safe.</li>
         </ul>
@@ -151,7 +176,7 @@ export function labScreen(root) {
   const copyBtn = $('#lab-copy');
   const copyLabel = $('#lab-copy-label');
   const logEl = $('#lab-log');
-  const selects = [$('#lab-source'), $('#lab-sensitivity'), $('#lab-flash'), $('#lab-intensity')];
+  const selects = [$('#lab-source'), $('#lab-sensitivity'), $('#lab-flash'), $('#lab-intensity'), $('#lab-dot')];
 
   let disposed = false;
   let starting = false;
@@ -192,6 +217,7 @@ export function labScreen(root) {
     const redDelta = Number($('#lab-sensitivity').value);
     const flashMs = Number($('#lab-flash').value);
     const flashIntensity = Number($('#lab-intensity').value);
+    const dotLimit = $('#lab-dot').value;
 
     if (!isSynthetic) {
       const support = checkCameraSupport({
@@ -262,13 +288,18 @@ export function labScreen(root) {
     logEl.innerHTML = '<li class="log__empty">Nothing yet.</li>';
     run = {
       isSynthetic,
-      settings: { source, redDelta, flashMs: isSynthetic ? flashMs : null, flashIntensity: isSynthetic ? flashIntensity : null },
+      settings: { source, redDelta, dotLimit, flashMs: isSynthetic ? flashMs : null, flashIntensity: isSynthetic ? flashIntensity : null },
+      t0: null, // time of the first analysed frame; event times in the report count from here
       emitted,
       calibration: mapper ? calibration : null,
       mapper,
       detected: [],
       rejected: 0,
-      rejectedBy: { cooldown: 0, persistent: 0, motion: 0 },
+      rejectedBy: { cooldown: 0, persistent: 0, motion: 0, large: 0 },
+      rejections: [],
+      ignored: [],
+      ignoredBy: { large: 0, motion: 0, unstable: 0 },
+      episode: null,
       frames: 0,
       scene: 'warming',
       sceneCounts: {},
@@ -287,10 +318,12 @@ export function labScreen(root) {
         if (!pipeline || pipeline.width !== image.width || pipeline.height !== image.height) {
           // With a calibration, only the target area is watched.
           const mask = mapper ? buildRoiMask(calibration.corners, image.width, image.height) : null;
-          pipeline = createFlashPipeline(image.width, image.height, { redDelta }, { mask });
+          pipeline = createFlashPipeline(image.width, image.height, { redDelta, ...DOT_LIMITS[dotLimit] }, { mask });
           run.working = { width: image.width, height: image.height };
         }
         const result = pipeline.process(image.data, frame.now);
+        if (run.t0 === null) run.t0 = frame.now;
+        trackIgnored(result, frame.now);
         run.frames += 1;
         run.scene = result.status;
         run.sceneCounts[result.status] = (run.sceneCounts[result.status] ?? 0) + 1;
@@ -305,13 +338,48 @@ export function labScreen(root) {
 
     starting = false;
     placeholder.hidden = true;
-    $('#lab-tag').textContent = isSynthetic ? 'Simulated' : 'Camera · untested';
+    $('#lab-tag').textContent = isSynthetic ? 'Simulated' : 'Camera · unverified';
     setStatus(
       'ok',
       isSynthetic ? 'Test pattern running.' : 'Camera running.',
-      isSynthetic ? 'A red dot flashes about once a second. Software check only.' : 'Hold the phone still. Detection on the camera has not been measured yet.',
+      isSynthetic ? 'A red dot flashes about once a second. Software check only.' : 'Prop the phone so it cannot move. Camera detection is still being measured.',
     );
     renderToggle();
+  }
+
+  /**
+   * Groups consecutive untrusted frames into one "ignored" entry, so a flash
+   * that was thrown away for being too big shows up as one line, not six.
+   */
+  function trackIgnored(result, now) {
+    const status = result.status;
+    const disturbed = status === 'large' || status === 'motion' || status === 'unstable' || status === 'adapting';
+    if (disturbed) {
+      if (!run.episode) run.episode = { t: now, frames: 0, kinds: {}, largest: null };
+      const episode = run.episode;
+      episode.frames += 1;
+      episode.kinds[status] = (episode.kinds[status] ?? 0) + 1;
+      if (result.largest && (!episode.largest || result.largest.fraction > episode.largest.fraction)) episode.largest = result.largest;
+      return;
+    }
+    const episode = run.episode;
+    if (!episode) return;
+    run.episode = null;
+    // 'adapting' only ever follows something else; name the stretch by its cause.
+    const kind = episode.kinds.large ? 'large' : episode.kinds.unstable ? 'unstable' : episode.kinds.motion ? 'motion' : null;
+    if (!kind) return;
+    run.ignoredBy[kind] += 1;
+    run.ignored.push({ t: episode.t, frames: episode.frames, kind, largest: episode.largest });
+    if (run.ignored.length > 200) run.ignored.shift();
+    const size = kind === 'large' && episode.largest ? ` (${fixed(episode.largest.fraction * 100)}% of the view)` : '';
+    addLog(`Ignored · ${IGNORED_TEXT[kind]}${size} · ${episode.frames} frame${episode.frames === 1 ? '' : 's'}`);
+    if (kind === 'large' && run.ignoredBy.large === 1) {
+      setStatus(
+        'info',
+        'Something red lit up more of the view than a dot would.',
+        'It was not counted as a hit. Cover the light so only a small spot shows, or set Dot size limit to Large.',
+      );
+    }
   }
 
   function onEvent(event) {
@@ -330,6 +398,8 @@ export function labScreen(root) {
     } else {
       run.rejected += 1;
       run.rejectedBy[event.reason] = (run.rejectedBy[event.reason] ?? 0) + 1;
+      run.rejections.push(event);
+      if (run.rejections.length > 200) run.rejections.shift();
       addLog(`Rejected · ${REJECTION_TEXT[event.reason] ?? event.reason}`);
     }
   }
@@ -370,7 +440,7 @@ export function labScreen(root) {
     return {
       app: 'LaserRange',
       report: 'detection-lab',
-      reportVersion: 4,
+      reportVersion: 5,
       build: BUILD_ID,
       createdAt: new Date().toISOString(),
       settings: run.settings,
@@ -383,6 +453,7 @@ export function labScreen(root) {
       sceneFrames: run.sceneCounts,
       frameChangePct: summarize(run.motionPct),
       rejectedBy: run.rejectedBy,
+      ignoredBy: run.ignoredBy,
       // How frames reached the detector: needed to tell "detector missed it"
       // apart from "the frame never arrived".
       delivery,
@@ -392,8 +463,10 @@ export function labScreen(root) {
       rejected: run.rejected,
       groundTruth,
       costMs: cost,
-      hits: run.detected.slice(-50).map((hit) => ({
+      // tMs everywhere below: milliseconds since the first analysed frame.
+      hits: run.detected.slice(-60).map((hit) => ({
         index: hit.index,
+        tMs: hit.t - run.t0,
         x: hit.x,
         y: hit.y,
         ...(hit.target ? { targetX: hit.target.x, targetY: hit.target.y, score: hit.score } : {}),
@@ -403,6 +476,23 @@ export function labScreen(root) {
         area: hit.area,
         strayPct: hit.stray * 100,
         confidence: hit.confidence,
+      })),
+      rejections: run.rejections.slice(-60).map((event) => ({
+        tMs: event.t - run.t0,
+        reason: event.reason,
+        x: event.x,
+        y: event.y,
+        frames: event.frames,
+        durationMs: event.durationMs,
+        peak: event.peak,
+        area: event.area,
+        strayPct: event.stray * 100,
+      })),
+      ignored: run.ignored.slice(-60).map((episode) => ({
+        tMs: episode.t - run.t0,
+        kind: episode.kind,
+        frames: episode.frames,
+        ...(episode.largest ? { largestPct: episode.largest.fraction * 100, x: episode.largest.x, y: episode.largest.y } : {}),
       })),
     };
   }
@@ -424,6 +514,10 @@ export function labScreen(root) {
     $('#r-cost').textContent = summary.costMs ? `${fixed(summary.costMs.mean, 2)} ms (worst ${fixed(summary.costMs.max, 1)})` : '–';
     $('#r-scene').textContent = SCENE_TEXT[run.scene] ?? run.scene;
     $('#r-frames').textContent = String(summary.frames);
+    const ignoredParts = Object.entries(summary.ignoredBy)
+      .filter(([, count]) => count > 0)
+      .map(([kind, count]) => `${count} × ${IGNORED_TEXT[kind]}`);
+    $('#r-ignored').textContent = ignoredParts.length ? ignoredParts.join(' · ') : 'nothing';
     const { observedFps, missedFrames } = summary.delivery;
     const drawn = summary.testPattern?.drawnFps;
     $('#r-delivery').textContent = observedFps

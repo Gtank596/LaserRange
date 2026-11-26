@@ -4,10 +4,11 @@ A private, installable web app that watches a printed target through the phone c
 laser dry-fire training cartridge, scores hits, and saves sessions on the device. A gift project; no backend, no
 accounts, no uploads.
 
-**Status (Nov 23, 2026): milestones 1 to 4 of 7.** The dashboard shows clearly labeled sample data. The camera
-check is real and measures frame timing. Flash detection works on simulated flashes and stays quiet on a real
-camera; it has not seen a real red flash. Target calibration and ring scoring work on the test pattern; they have
-not been tried on a printed target. Nothing is saved as a session yet.
+**Status (Nov 25, 2026): milestones 1 to 4 of 7 built, 5 and 6 under way.** The dashboard shows clearly labeled
+sample data. The camera check is real and measures frame timing. Flash detection works on simulated flashes and
+stays quiet on a still real camera. An LED test light now exists and the camera has seen its 100 ms flashes; the
+app has not yet counted them correctly on the phone (see "First real flashes"). Target calibration and ring scoring
+work on the test pattern; they have not been tried on a printed target. Nothing is saved as a session yet.
 
 ## What works today
 
@@ -16,8 +17,9 @@ not been tried on a printed target. Nothing is saved as a session yet.
 | Dashboard (stats, target overlay, navigation) | Built, using sample data that is labeled as such |
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
-| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 23 deterministic unit tests on synthetic frames |
-| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern and on a still camera scene (see "Measured so far"). **No real red flash tested yet** |
+| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 29 deterministic unit tests on synthetic frames |
+| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **No clean count of real flashes yet; no laser tested** |
+| LED test light (Arduino): 30 flashes of 100 ms, one per second | Built by hand; sketches in `hardware/` |
 | Printable target: 180 mm square, 10 rings, 50 mm check bar | Built; **not yet printed and measured** |
 | Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
@@ -157,7 +159,47 @@ shades closed (medium brightness). Detection at 320 x 569 pixels.
   22 frames were flagged as movement and skipped. Between-frame change was 0% of the picture at the median and
   reached 43% at its peak (the light switch). One run, so this shows the fix works here, not how often it would
   fail.
-- No real red flash has been shown to the camera yet.
+- No real red flash had been shown to the camera at this point.
+
+### First real flashes: the LED test light
+
+Nov 25, 2026, build `67f1933`, installed app, evening indoor light. The test light is a red LED on a breadboard
+driven by `hardware/FlashTest`: after a 15 second wait it sends 30 flashes, each 100 ms long, one per second, then
+stops. Lab settings: Source Rear camera, Sensitivity Normal, no calibration. An LED is not a laser; these runs say
+nothing about the cartridge.
+
+| Run | Setup | Length | Hits | Rejected | Notes |
+|---|---|---|---|---|---|
+| 1 | Phone held by hand, LED on a white surface | 2441 frames (~41 s) | 29 | 51 | Not interpretable: the phone was moving |
+| 2 | Phone propped, breadboard on grey carpet in front of a white wall | 2543 frames (~42 s) | 1 | 20 | The one hit came from bumping the phone before the flashes began. **None of the 30 flashes was counted** |
+
+What run 2 showed, from the report and a screen recording of the same run:
+
+- **The camera delivered every flash.** All 30 are in the screen recording, each visible for 4 to 6 recorded
+  frames, one second apart. Frames reached the detector at 59.85 fps with none missed.
+- **The detector saw them and threw them away.** 188 frames were flagged "movement", about six per flash. The lit
+  LED did not look like a dot: it lit the white breadboard under it and the wall behind it, a red area of about 2%
+  of the picture. The limit for a dot is 1%, and at the time anything larger was filed under movement.
+- **Replaying the recording through the detector on a PC** (16 seconds, 10 flashes, cropped and shrunk to 320
+  pixels wide) reproduced this: 0 hits with the 1% limit, **10 of 10 hits with a 5% limit**, each 83 to 100 ms
+  long, 1000 ms apart, at the same place. A screen recording is a re-compressed copy of the preview, so this is
+  strong evidence, not the measurement itself; the phone run with the new build is still to do.
+- In the same replay a flash's own glow used up most of the allowance for "movement elsewhere" (up to 0.29% of the
+  picture against a limit of 0.3%).
+
+Changes made in response:
+
+- A lit area too big to be a dot is now reported as that ("large"), on screen and in the report, instead of as
+  movement. If it stays for more than 400 ms the background absorbs it, so it cannot block detection for good.
+- The movement check now allows for a flash's own glow: near a spot, change in one direction only (brighter when it
+  comes on, darker when it goes off) is part of the flash. Change in both directions near the spot, or any change
+  away from it, still counts as movement. In the replay the unexplained change fell from 0.29% to 0.12%.
+- The lab has a "Dot size limit" setting (Normal 1%, Large 5%) so a bare LED can be used for timing tests.
+- Lab reports (version 5) now carry a time for every hit, the details of every rejection, and every stretch of
+  ignored video with its cause and size.
+
+Still unknown: how many of 30 flashes the phone counts with the new build; flashes shorter than 100 ms; how big and
+bright a laser dot on paper looks to this camera, which decides whether 1% is the right limit.
 
 ## How detection works
 
@@ -168,10 +210,12 @@ Each frame is shrunk to 320 pixels wide and compared with a slowly updating memo
 2. **Per frame:** changed pixels are grouped into regions. A region must be small (a dot, not a red shirt) and
    contain at least one genuinely red pixel. If a large share of the frame changes at once, the frame is treated
    as a lighting change or camera movement and skipped.
-3. **Movement check:** a flash changes its own spot and nothing else. If other parts of the frame changed since
-   the previous frame, or a changed region is too big to be a dot, something is moving in view; the frame is
-   skipped and any hit that was forming is discarded.
-4. **Across frames:** spots in consecutive frames at the same place become one hit. Something that stays lit
+3. **Size check:** if any lit region is too big to be a dot, the frame is skipped and reported as "large".
+4. **Movement check:** a flash changes its own spot and the glow around it, in one direction: brighter when it
+   comes on, darker when it goes off. If other parts of the frame changed since the previous frame, or the area
+   around the spot got both brighter and darker (an object arriving in one place and leaving another), something
+   is moving in view; the frame is skipped and any hit that was forming is discarded.
+5. **Across frames:** spots in consecutive frames at the same place become one hit. Something that stays lit
    longer than 400 ms is rejected as an object, and a second hit within 120 ms of the last is suppressed.
 
 Known gap: a small reddish object entering the view slowly, with no trailing edge yet in frame, can still look
@@ -202,8 +246,12 @@ score, and distances can later be given in millimetres.
   by hand on a phone, lens distortion, and a sheet that is not flat are all unmeasured.
 - **Print scale.** Ring scores do not depend on it, but millimetre figures will. The sheet has a 50 mm bar to
   check with a ruler.
-- **Detection settings.** Chosen against synthetic frames only. Real camera noise, auto-exposure shifts, the true
-  size and brightness of the laser dot, and hand movement are all unmeasured.
+- **Detection settings.** Chosen against synthetic frames, plus one recording of an LED. The true size and
+  brightness of a laser dot on paper are unmeasured, so the 1% dot size limit is a guess. With a calibration the
+  limit is 1% of the target area, which is smaller still and has never been tried on a real light.
+- **The LED is not the laser.** It is far longer (100 ms so far), a different brightness, and lights up its
+  surroundings. It can show whether the camera and detector catch a red flash of a given length; it cannot show
+  that the cartridge will be detected.
 - **Frame rate.** Requested values are hints. 120 fps was not available in the one run so far (see above); a Safari
   tab has not been measured separately from the installed app.
 - **Flash capture.** Frame timing says when frames reach the page, not how long the sensor exposed each frame.
@@ -220,6 +268,7 @@ score, and distances can later be given in millimetres.
 
 ```text
 index.html
+hardware/               Arduino sketches for the LED test light (LedBlink: wiring check; FlashTest: 30 counted flashes)
 public/                 manifest and icons (PNG icons generated by scripts/make-icons.mjs)
 scripts/make-icons.mjs  dependency-free icon generator: npm run icons
 src/
@@ -249,6 +298,6 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 2. ~~Camera permission flow, preview, frame telemetry~~ (iPhone run pending)
 3. ~~Simulation: controllable synthetic flashes and deterministic detection fixtures~~ (full-frame-rate run pending)
 4. ~~Calibration: four-corner overlay, homography, known-point tests~~ (printed-target run pending)
-5. Arduino LED fixture with counted pulses over serial
+5. Arduino LED fixture: built, 30 counted flashes of 100 ms (shorter flashes and a dot-sized light still to do)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
 7. Sessions, IndexedDB, history, offline service worker, printable guide and QR card

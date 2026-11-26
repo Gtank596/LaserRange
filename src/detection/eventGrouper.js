@@ -7,7 +7,8 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 // It returns null, or one event:
 //   { accepted: true,  index, t, endT, durationMs, frames, x, y, peak, area, stray }
 //   { accepted: false, reason: 'cooldown' | 'persistent', ...same fields }
-// cancel(reason) discards the hit in progress (used when the scene is disturbed).
+// cancel(reason) discards the hit in progress (used when the scene is disturbed;
+// the pipeline passes 'motion' or 'large').
 
 /**
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]

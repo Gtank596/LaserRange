@@ -19,8 +19,10 @@ export function mulberry32(seed) {
 /**
  * @param {{ width: number, height: number, seed?: number, base?: number, noise?: number }} options
  *   base: grey level of the scene (0-255); noise: +/- range added independently per channel per frame.
- * @returns {(frame?: { flashes?: { x: number, y: number, radius: number, intensity: number, core?: boolean }[], objects?: { x: number, y: number, w: number, h: number, color: number[] }[], brightness?: number }) => Uint8ClampedArray}
+ * @returns {(frame?: { flashes?: { x: number, y: number, radius: number, intensity: number, core?: boolean, glow?: boolean }[], objects?: { x: number, y: number, w: number, h: number, color: number[] }[], brightness?: number }) => Uint8ClampedArray}
  *   flashes use normalised x/y (0-1), radius in pixels, intensity 0-1. `core: true` blows the centre out to white.
+ *   `glow: true` adds reddish light to what is there instead of painting a red dot: the wash a light
+ *   throws on its surroundings.
  *   objects are solid rectangles in pixel coordinates. brightness shifts the whole scene.
  */
 export function createSceneRenderer({ width, height, seed = 1, base = 110, noise = 6 }) {
@@ -73,6 +75,12 @@ export function createSceneRenderer({ width, height, seed = 1, base = 110, noise
           // Full strength in the middle, fading linearly over the outer 40%.
           const falloff = d <= r * 0.6 ? 1 : (r - d) / (r * 0.4);
           const a = flash.intensity * falloff;
+          if (flash.glow) {
+            data[j] += (255 - data[j]) * a;
+            data[j + 1] += 60 * a;
+            data[j + 2] += 60 * a;
+            continue;
+          }
           data[j] += (255 - data[j]) * a;
           data[j + 1] += (40 - data[j + 1]) * a;
           data[j + 2] += (30 - data[j + 2]) * a;

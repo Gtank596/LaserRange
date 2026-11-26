@@ -15,10 +15,19 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 //   'ok'       normal frame
 //   'unstable' too much of the frame changed at once (lighting or motion)
 //   'adapting' background is catching up after 'unstable' or absorb()
-//   'motion'   something is moving in view: either a changed region too big
-//              to be a dot, or a spot was found while other parts of the frame
-//              changed too. Nothing in the frame is trusted. (First seen on a
-//              real camera: a waving hand produced weak red "spots" at its edge.)
+//   'motion'   a spot was found while other parts of the frame changed too:
+//              something is moving in view. Nothing in the frame is trusted.
+//              (First seen on a real camera: a waving hand produced weak red
+//              "spots" at its edge.)
+//   'large'    a lit region too big to be a laser dot. Nothing in the frame is
+//              trusted. (First seen on a real camera: a bare LED lit about 2%
+//              of the picture by shining on the white board it stood on.)
+//
+// What counts as "other parts of the frame": a flash also brightens a glow
+// around itself when it comes on, and that glow fades when it goes off. So
+// near the spot, change in one direction only is part of the flash. A moving
+// object brightens where it arrives and darkens where it left, so change in
+// both directions near the spot, or any change away from it, is movement.
 
 /**
  * @param {number} width
@@ -38,18 +47,46 @@ export function createFrameDetector(width, height, overrides = {}, { mask = null
   const prevLuma = new Float32Array(pixels);
   const score = new Float32Array(pixels);
   const isRed = new Uint8Array(pixels);
+  const moved = new Uint8Array(pixels); // since the previous frame: 1 brighter, 2 darker
   const findBlobs = createBlobFinder(width, height);
   const maxArea = Math.max(p.minArea, Math.floor(count * p.maxAreaFraction));
   let initialised = false;
   let fastFrames = 0;
 
-  const empty = (status, candidateFraction = 0, motionFraction = 0) => ({
+  const empty = (status, candidateFraction = 0, motionFraction = 0, largest = null) => ({
     status,
     candidateFraction,
     motionFraction,
+    largest,
     blobs: [],
     best: null,
   });
+
+  /** The biggest lit region of a frame, with its size as a share of the watched area. */
+  const describeLargest = (regions) => {
+    let big = null;
+    for (const blob of regions) if (!big || blob.area > big.area) big = blob;
+    return big ? { x: big.x, y: big.y, fraction: big.area / count } : null;
+  };
+
+  /** Pixels that changed since the previous frame and are not explained by this spot's own glow. */
+  function strayPixels(blob, moving) {
+    const size = Math.max(blob.maxX - blob.minX, blob.maxY - blob.minY) + 1;
+    const margin = Math.max(Math.round(width * p.haloMin), Math.round(size * p.haloScale));
+    const x0 = Math.max(0, blob.minX - margin);
+    const x1 = Math.min(width - 1, blob.maxX + margin);
+    const y0 = Math.max(0, blob.minY - margin);
+    const y1 = Math.min(height - 1, blob.maxY + margin);
+    let brighter = 0;
+    let darker = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let i = y * width + x0, end = y * width + x1; i <= end; i++) {
+        if (moved[i] === 1) brighter += 1;
+        else if (moved[i] === 2) darker += 1;
+      }
+    }
+    return moving - (brighter + darker) + Math.min(brighter, darker);
+  }
 
   return {
     width,
@@ -101,7 +138,15 @@ export function createFrameDetector(width, height, overrides = {}, { mask = null
         // it is, from a flash, which changes one spot.
         const dPrev = luma - prevLuma[i];
         prevLuma[i] = luma;
-        if (dPrev >= p.motionDelta || dPrev <= -p.motionDelta) moving += 1;
+        if (dPrev >= p.motionDelta) {
+          moved[i] = 1;
+          moving += 1;
+        } else if (dPrev <= -p.motionDelta) {
+          moved[i] = 2;
+          moving += 1;
+        } else {
+          moved[i] = 0;
+        }
 
         let s = 0;
         let redFlag = 0;
@@ -135,9 +180,10 @@ export function createFrameDetector(width, height, overrides = {}, { mask = null
       if (candidates === 0) return empty('ok', 0, motionFraction);
 
       const regions = findBlobs(score, isRed);
-      // A changed region bigger than any laser dot is an object, not a flash;
-      // nothing else in this frame is trusted either.
-      if (regions.some((blob) => blob.area > maxArea)) return empty('motion', candidateFraction, motionFraction);
+      const largest = describeLargest(regions);
+      // A lit region bigger than any laser dot is not a hit; nothing else in
+      // this frame is trusted either.
+      if (regions.some((blob) => blob.area > maxArea)) return empty('large', candidateFraction, motionFraction, largest);
 
       const blobs = regions.filter((blob) => blob.area >= p.minArea && blob.redArea >= 1);
       let best = null;
@@ -145,11 +191,11 @@ export function createFrameDetector(width, height, overrides = {}, { mask = null
         if (!best || blob.strength > best.strength) best = blob;
       }
       if (best) {
-        // Movement elsewhere in the frame, as a share of the frame.
-        best.stray = Math.max(0, moving - best.area) / count;
-        if (best.stray > p.maxStrayFraction) return empty('motion', candidateFraction, motionFraction);
+        // Movement not explained by the spot itself, as a share of the frame.
+        best.stray = strayPixels(best, moving) / count;
+        if (best.stray > p.maxStrayFraction) return empty('motion', candidateFraction, motionFraction, largest);
       }
-      return { status: 'ok', candidateFraction, motionFraction, blobs, best };
+      return { status: 'ok', candidateFraction, motionFraction, largest, blobs, best };
     },
   };
 }

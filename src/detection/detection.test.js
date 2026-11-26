@@ -191,9 +191,59 @@ describe('flash pipeline on synthetic frames', () => {
     });
   });
 
-  it('rejects a red region far larger than a laser dot', () => {
-    const { hits } = runSequence({ frames: 60, flashesFor: (i) => (i === 30 ? [dot({ radius: 20 })] : []) });
+  it('rejects a red region far larger than a laser dot, and says it was too large rather than movement', () => {
+    // Radius 10 is about 1.6% of this frame: over the 1% dot limit, under the 3% "scene change" limit.
+    const { hits, statuses } = runSequence({ frames: 60, flashesFor: (i) => (i === 30 ? [dot({ radius: 10 })] : []) });
     expect(hits).toHaveLength(0);
+    expect(statuses.has('large')).toBe(true);
+    expect(statuses.has('motion')).toBe(false);
+  });
+
+  it('reports a hit that grows too large as rejected for size', () => {
+    // One frame of a small spot, then the lit area spreads (as a partly exposed first frame can).
+    const { events } = runSequence({
+      frames: 60,
+      flashesFor: (i) => (i === 30 ? [dot()] : i > 30 && i < 36 ? [dot({ radius: 10 })] : []),
+    });
+    expect(events.map((event) => event.reason)).toEqual(['large']);
+  });
+
+  it('gets used to a large red area that stays, and finds a flash next to it afterwards', () => {
+    const { hits, statuses } = runSequence({
+      frames: 220,
+      flashesFor: (i) => {
+        const flashes = [];
+        if (i >= 30) flashes.push(dot({ radius: 10 })); // appears and never leaves
+        if (i === 190) flashes.push(dot({ x: 0.8, y: 0.3 }));
+        return flashes;
+      },
+    });
+    expect(statuses.has('large')).toBe(true);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].x).toBeCloseTo(0.8, 1);
+  });
+
+  describe('a flash that also lights up its surroundings', () => {
+    // A red dot plus a wide, weak wash of light around it. The wash is not red
+    // enough to be part of the spot but does change the brightness of far more
+    // of the picture than the movement check allows.
+    const lit = (from, to) => (i) => (i >= from && i <= to ? [{ ...dot(), radius: 16, intensity: 0.45, glow: true }, dot()] : []);
+
+    it('is found, once, for a single frame and for a 100 ms flash', () => {
+      const single = runSequence({ frames: 80, flashesFor: lit(30, 30) });
+      expect(single.hits).toHaveLength(1);
+      expect(single.statuses.has('motion')).toBe(false);
+      const long = runSequence({ frames: 80, flashesFor: lit(30, 35) });
+      expect(long.hits).toHaveLength(1);
+      expect(long.hits[0].frames).toBe(6);
+      expect(Math.abs(long.hits[0].x - 0.3)).toBeLessThan(0.01);
+    });
+
+    it('would be taken for movement if the glow were not allowed for (so the test above means something)', () => {
+      const { hits, statuses } = runSequence({ frames: 80, flashesFor: lit(30, 35), params: { haloScale: 0, haloMin: 0 } });
+      expect(hits).toHaveLength(0);
+      expect(statuses.has('motion')).toBe(true);
+    });
   });
 });
 

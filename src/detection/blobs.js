@@ -8,6 +8,10 @@
  * @property {number} peak      highest pixel score
  * @property {number} x         score-weighted centre, 0-1 across the frame width
  * @property {number} y         score-weighted centre, 0-1 down the frame height
+ * @property {number} minX      bounding box, in pixels (inclusive)
+ * @property {number} maxX
+ * @property {number} minY
+ * @property {number} maxY
  */
 
 /**
@@ -39,12 +43,20 @@ export function createBlobFinder(width, height) {
       let peak = 0;
       let sumX = 0;
       let sumY = 0;
+      let minX = width;
+      let maxX = 0;
+      let minY = height;
+      let maxY = 0;
 
       while (top > 0) {
         const i = stack[--top];
         const x = i % width;
         const y = (i - x) / width;
         const s = score[i];
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
         area += 1;
         redArea += isRed[i];
         strength += s;
@@ -67,7 +79,7 @@ export function createBlobFinder(width, height) {
         }
       }
 
-      blobs.push({ area, redArea, strength, peak, x: sumX / strength / width, y: sumY / strength / height });
+      blobs.push({ area, redArea, strength, peak, x: sumX / strength / width, y: sumY / strength / height, minX, maxX, minY, maxY });
     }
     return blobs;
   };

@@ -1,5 +1,7 @@
 // Tunable detection settings. Every value is a starting guess chosen against
-// synthetic frames; none has been validated against a real camera or cartridge.
+// synthetic frames. The first runs against a real LED (2026-11-25) changed how
+// movement is told from a flash's own glow; no value has been validated against
+// a laser cartridge.
 
 export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   // --- per-pixel test ---
@@ -22,11 +24,18 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   /** Brightness change (0-255) since the previous frame that counts a pixel as "moving". */
   motionDelta: 30,
   /**
-   * A flash changes only its own spot. If more than this share of the frame
-   * changed since the previous frame, not counting the spot itself, something
-   * is moving in view (a hand, a person) and the frame is skipped.
+   * A flash changes only its own spot and the glow around it. If more than
+   * this share of the frame changed since the previous frame in a way the spot
+   * does not explain, something is moving in view (a hand, a person) and the
+   * frame is skipped.
    */
   maxStrayFraction: 0.003,
+  /**
+   * How far a spot's own glow is allowed to reach: this many times the spot's
+   * size on every side, and at least haloMin of the frame width.
+   */
+  haloScale: 1,
+  haloMin: 0.02,
 
   // --- grouping frames into one hit ---
   /** A hit ends once no spot has been seen for longer than this. */

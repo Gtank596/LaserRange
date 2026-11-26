@@ -14,6 +14,7 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
   const detector = createFrameDetector(width, height, params, options);
   const grouper = createEventGrouper(params);
   let lastDisturbedT = -Infinity;
+  let largeSince = null;
 
   const decorate = (event) => {
     if (!event) return null;
@@ -34,15 +35,26 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
      */
     process(data, t) {
       const frame = detector.process(data);
-      const disturbed = frame.status === 'motion' || frame.status === 'unstable' || frame.status === 'adapting';
+      const disturbed = frame.status === 'motion' || frame.status === 'large' || frame.status === 'unstable' || frame.status === 'adapting';
       let blob = null;
       let event;
       if (disturbed) {
         // A flash changes one spot and nothing else. If the scene moved or the
         // lighting changed while a hit was forming, the hit is not trusted.
         lastDisturbedT = t;
-        event = grouper.cancel('motion');
+        event = grouper.cancel(frame.status === 'large' ? 'large' : 'motion');
+        // A big lit area that stays is part of the scene now (a lamp switched
+        // on, something red put in view): let the background take it, or
+        // nothing would be detected for as long as it stays.
+        if (frame.status === 'large') {
+          if (largeSince === null) largeSince = t;
+          else if (t - largeSince > params.maxEventMs) {
+            detector.absorb();
+            largeSince = null;
+          }
+        }
       } else {
+        largeSince = null;
         if (frame.status === 'ok' && t - lastDisturbedT >= params.settleMs) blob = frame.best;
         event = grouper.push(t, blob);
       }
@@ -50,6 +62,8 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
         status: frame.status,
         candidateFraction: frame.candidateFraction,
         motionFraction: frame.motionFraction,
+        largest: frame.largest,
+        largestFraction: frame.largest ? frame.largest.fraction : 0,
         blob,
         event: decorate(event),
       };
