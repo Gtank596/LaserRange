@@ -464,7 +464,7 @@ export function labScreen(root) {
       groundTruth,
       costMs: cost,
       // tMs everywhere below: milliseconds since the first analysed frame.
-      hits: run.detected.slice(-60).map((hit) => ({
+      hits: run.detected.slice(-300).map((hit) => ({
         index: hit.index,
         tMs: hit.t - run.t0,
         x: hit.x,
@@ -477,7 +477,7 @@ export function labScreen(root) {
         strayPct: hit.stray * 100,
         confidence: hit.confidence,
       })),
-      rejections: run.rejections.slice(-60).map((event) => ({
+      rejections: run.rejections.slice(-100).map((event) => ({
         tMs: event.t - run.t0,
         reason: event.reason,
         x: event.x,
@@ -488,7 +488,7 @@ export function labScreen(root) {
         area: event.area,
         strayPct: event.stray * 100,
       })),
-      ignored: run.ignored.slice(-60).map((episode) => ({
+      ignored: run.ignored.slice(-100).map((episode) => ({
         tMs: episode.t - run.t0,
         kind: episode.kind,
         frames: episode.frames,
