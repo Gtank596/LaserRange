@@ -26,7 +26,7 @@ const fixed = (value, digits = 1) => (typeof value === 'number' && Number.isFini
 
 const SCENE_TEXT = {
   ok: 'Steady',
-  warming: 'Starting',
+  warming: 'Starting: nothing counted yet',
   unstable: 'Too much change',
   adapting: 'Settling',
   motion: 'Movement in view',
@@ -152,6 +152,7 @@ export function labScreen(root) {
         <ul class="notes">
           <li>The test pattern is drawn by this app at the screen's refresh rate. Passing it shows the detection logic works; it says nothing about a real camera sensor or a real laser.</li>
           <li>The shortest test flash is one video frame (about 17 ms). On a 120 Hz screen anything shorter is drawn and gone between two video frames, so it would never reach detection at all.</li>
+          <li>Nothing is counted in the first 2 seconds after starting: a camera that has just been switched on is still settling, and on a real camera that produced a false red spot. Test flashes drawn in that time are left out of the totals.</li>
           <li>“Rejected” counts things seen but not reported as hits: a second flash too soon after the first, something red that stayed in view, or a spot seen while other things were moving or the light was changing.</li>
           <li>“Ignored” counts stretches of video the detector did not trust at all: something lit up more of the view than a dot would, something was moving, or the whole picture changed.</li>
           <li>Dot size limit “Large” is for testing with a bare LED, which lights up whatever is around it. A laser dot on paper has not been measured yet, so the normal limit is still a guess.</li>
@@ -290,6 +291,8 @@ export function labScreen(root) {
       isSynthetic,
       settings: { source, redDelta, dotLimit, flashMs: isSynthetic ? flashMs : null, flashIntensity: isSynthetic ? flashIntensity : null },
       t0: null, // time of the first analysed frame; event times in the report count from here
+      readyAt: null, // time of the first frame after the warm-up
+      warmupMs: null,
       emitted,
       calibration: mapper ? calibration : null,
       mapper,
@@ -320,9 +323,11 @@ export function labScreen(root) {
           const mask = mapper ? buildRoiMask(calibration.corners, image.width, image.height) : null;
           pipeline = createFlashPipeline(image.width, image.height, { redDelta, ...DOT_LIMITS[dotLimit] }, { mask });
           run.working = { width: image.width, height: image.height };
+          run.warmupMs = pipeline.params.warmupMs;
         }
         const result = pipeline.process(image.data, frame.now);
         if (run.t0 === null) run.t0 = frame.now;
+        if (run.readyAt === null && result.status !== 'warming') run.readyAt = frame.now;
         trackIgnored(result, frame.now);
         run.frames += 1;
         run.scene = result.status;
@@ -342,7 +347,9 @@ export function labScreen(root) {
     setStatus(
       'ok',
       isSynthetic ? 'Test pattern running.' : 'Camera running.',
-      isSynthetic ? 'A red dot flashes about once a second. Software check only.' : 'Prop the phone so it cannot move. Camera detection is still being measured.',
+      isSynthetic
+        ? 'A red dot flashes about once a second. Nothing is counted in the first 2 seconds. Software check only.'
+        : 'Prop the phone so it cannot move. Nothing is counted in the first 2 seconds. Camera detection is still being measured.',
     );
     renderToggle();
   }
@@ -408,9 +415,9 @@ export function labScreen(root) {
     const cost = summarize(run.costMs);
     // A wide time window: on a slow or throttled display a frame can reach the
     // detector a second or more after it was drawn. Position keeps matches honest.
-    const match = run.isSynthetic
-      ? matchEvents(run.emitted, run.detected, { now: performance.now(), maxDelayMs: MATCH_WINDOW_MS })
-      : null;
+    // Flashes drawn during the warm-up are not expected to be found, so they are left out.
+    const counted = run.readyAt === null ? [] : run.emitted.filter((flash) => flash.t >= run.readyAt);
+    const match = run.isSynthetic ? matchEvents(counted, run.detected, { now: performance.now(), maxDelayMs: MATCH_WINDOW_MS }) : null;
     const { recentIntervalsMs: _intervals, ...delivery } = run.delivery.snapshot();
 
     // On the calibrated test pattern the true target position of every flash is
@@ -440,10 +447,12 @@ export function labScreen(root) {
     return {
       app: 'LaserRange',
       report: 'detection-lab',
-      reportVersion: 5,
+      reportVersion: 6,
       build: BUILD_ID,
       createdAt: new Date().toISOString(),
       settings: run.settings,
+      // Nothing is counted for this long after the first analysed frame.
+      warmupMs: run.warmupMs,
       calibration: run.calibration ? { inUse: true, savedAt: run.calibration.savedAt, corners: run.calibration.corners } : { inUse: false },
       scoreCheck,
       video: { width: video.videoWidth, height: video.videoHeight },

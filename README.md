@@ -19,7 +19,7 @@ work on the test pattern; they have not been tried on a printed target. Nothing 
 | Dashboard (stats, target overlay, navigation) | Built, using sample data that is labeled as such |
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
-| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 29 deterministic unit tests on synthetic frames |
+| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
 | Printable target: 180 mm square, 10 rings, 50 mm check bar | Built; **not yet printed and measured** |
@@ -262,7 +262,12 @@ each hit was matched to the sketch's schedule by that time.
   movement and a red spot at the LED's position was rejected for staying lit over 400 ms. Nothing was counted.
   Same pattern as run 3, so it is not chance. The unlit LED has a red body; the camera settling after it starts
   is the likely cause, not confirmed. A shorter-lived version of this could be counted as a hit, so the detector
-  should not count anything in its first second or so. Not yet done.
+  should not count anything while the camera settles.
+- **Change made in response (same day):** nothing is counted in the first 2 seconds of a run, and the background
+  follows the picture closely during that time, so whatever is in view when the warm-up ends is the starting
+  point. Two seconds, not one, because in run 3 the artefact lasted until 1.85 s. Checked on synthetic frames and
+  on the test pattern in a desktop browser; **not yet run on the phone's camera**, so whether it removes the
+  artefact there is unconfirmed. Lab reports are now version 6 and carry the warm-up length.
 - One run, one LED, one distance, one lighting condition.
 
 Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
@@ -270,7 +275,8 @@ limit and whether a short pulse is caught; the cartridge's actual pulse length; 
 
 ## How detection works
 
-Each frame is shrunk to 320 pixels wide and compared with a slowly updating memory of the scene.
+Each frame is shrunk to 320 pixels wide and compared with a slowly updating memory of the scene. Nothing is
+counted in the first 2 seconds after starting, while the camera settles.
 
 1. **Per pixel:** how much redder is it than it was (red minus the larger of green and blue)? A pixel also counts
    if it is blown out and much brighter than before, which is how the white centre of a bright dot is kept.

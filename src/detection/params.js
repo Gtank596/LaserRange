@@ -37,6 +37,15 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   haloScale: 1,
   haloMin: 0.02,
 
+  // --- start of a run ---
+  /**
+   * Nothing is counted for this long after the first frame, and the background
+   * follows the picture closely meanwhile. A camera that has just started is
+   * still settling: in two LED runs (2026-11-25 and 2026-11-27) a red spot at
+   * the unlit LED was seen in the first 0.3 to 1.85 s, before any flash.
+   */
+  warmupMs: 2000,
+
   // --- grouping frames into one hit ---
   /** A hit ends once no spot has been seen for longer than this. */
   maxGapMs: 40,

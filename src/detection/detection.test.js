@@ -17,7 +17,8 @@ const FRAME_MS = 1000 / 60;
  */
 function runSequence({ frames, flashesFor = () => [], objectsFor = () => [], brightnessFor = () => 0, params, seed = 7, noise = 6 }) {
   const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed, noise });
-  const pipeline = createFlashPipeline(WIDTH, HEIGHT, params);
+  // No warm-up unless a test asks for one, so flashes can come early in a sequence.
+  const pipeline = createFlashPipeline(WIDTH, HEIGHT, { warmupMs: 0, ...params });
   const events = [];
   const statuses = new Set();
   for (let i = 0; i < frames; i++) {
@@ -171,7 +172,7 @@ describe('flash pipeline on synthetic frames', () => {
 
     const run = (flashesFor, objectsFor = () => []) => {
       const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed: 3 });
-      const pipeline = createFlashPipeline(WIDTH, HEIGHT, {}, { mask: leftHalf });
+      const pipeline = createFlashPipeline(WIDTH, HEIGHT, { warmupMs: 0 }, { mask: leftHalf });
       const hits = [];
       for (let i = 0; i < 80; i++) {
         const result = pipeline.process(render({ flashes: flashesFor(i), objects: objectsFor(i) }), i * FRAME_MS);
@@ -221,6 +222,54 @@ describe('flash pipeline on synthetic frames', () => {
     expect(statuses.has('large')).toBe(true);
     expect(hits).toHaveLength(1);
     expect(hits[0].x).toBeCloseTo(0.8, 1);
+  });
+
+  describe('the warm-up at the start of a run', () => {
+    // Two seconds by default: 120 frames at 60 fps.
+    const WARMUP = { warmupMs: 2000 };
+
+    it('counts nothing during the warm-up and finds a flash after it', () => {
+      const { events, hits, statuses } = runSequence({
+        frames: 200,
+        params: WARMUP,
+        flashesFor: (i) => (i === 30 || (i >= 80 && i <= 85) ? [dot()] : i === 160 ? [dot({ x: 0.7, y: 0.2 })] : []),
+      });
+      expect(events).toHaveLength(1);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].x).toBeCloseTo(0.7, 1);
+      expect(hits[0].t).toBeCloseTo(160 * FRAME_MS, 6);
+      expect(statuses.has('warming')).toBe(true);
+    });
+
+    it('reports every frame of the warm-up as warming, and none after it', () => {
+      const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed: 7 });
+      const pipeline = createFlashPipeline(WIDTH, HEIGHT);
+      const statuses = [];
+      for (let i = 0; i < 150; i++) statuses.push(pipeline.process(render(), i * FRAME_MS).status);
+      expect(statuses.slice(0, 120).every((status) => status === 'warming')).toBe(true);
+      expect(statuses.slice(120).every((status) => status === 'ok')).toBe(true);
+    });
+
+    it('takes a red spot that appears during the warm-up and stays as part of the scene', () => {
+      // What the real camera showed: a red spot at the unlit LED soon after starting.
+      const stays = (i) => (i >= 20 ? [dot()] : []);
+      const withWarmup = runSequence({
+        frames: 240,
+        params: WARMUP,
+        flashesFor: (i) => [...stays(i), ...(i === 200 ? [dot({ x: 0.7, y: 0.2 })] : [])],
+      });
+      expect(withWarmup.events).toHaveLength(1);
+      expect(withWarmup.hits).toHaveLength(1);
+      expect(withWarmup.hits[0].x).toBeCloseTo(0.7, 1);
+      // Without the warm-up the same spot is seen and rejected (so the test above means something).
+      const without = runSequence({ frames: 240, flashesFor: stays });
+      expect(without.events.map((event) => event.reason)).toEqual(['persistent']);
+    });
+
+    it('does not report a spot that is still lit when the warm-up ends', () => {
+      const { events } = runSequence({ frames: 200, params: WARMUP, flashesFor: (i) => (i >= 115 && i <= 125 ? [dot()] : []) });
+      expect(events).toEqual([]);
+    });
   });
 
   describe('a flash that also lights up its surroundings', () => {

@@ -11,7 +11,8 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 // a region must be small and must contain at least one red-dominant pixel.
 //
 // Status values:
-//   'warming'  first frame, background being initialised
+//   'warming'  first frame, background being initialised (the pipeline also
+//              reports 'warming' for its whole start-of-run warm-up)
 //   'ok'       normal frame
 //   'unstable' too much of the frame changed at once (lighting or motion)
 //   'adapting' background is catching up after 'unstable' or absorb()

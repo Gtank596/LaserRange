@@ -15,6 +15,7 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
   const grouper = createEventGrouper(params);
   let lastDisturbedT = -Infinity;
   let largeSince = null;
+  let firstT = null;
 
   const decorate = (event) => {
     if (!event) return null;
@@ -34,6 +35,24 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
      * @param {number} t frame time in ms
      */
     process(data, t) {
+      if (firstT === null) firstT = t;
+      if (t - firstT < params.warmupMs) {
+        // The camera has just started and is still settling. Count nothing,
+        // and let the background follow the picture so that whatever is in
+        // view when the warm-up ends is the starting point.
+        detector.absorb(1);
+        const settling = detector.process(data);
+        lastDisturbedT = t;
+        return {
+          status: 'warming',
+          candidateFraction: settling.candidateFraction,
+          motionFraction: settling.motionFraction,
+          largest: null,
+          largestFraction: 0,
+          blob: null,
+          event: null,
+        };
+      }
       const frame = detector.process(data);
       const disturbed = frame.status === 'motion' || frame.status === 'large' || frame.status === 'unstable' || frame.status === 'adapting';
       let blob = null;
