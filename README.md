@@ -4,10 +4,11 @@ A private, installable web app that watches a printed target through the phone c
 laser dry-fire training cartridge, scores hits, and saves sessions on the device. A gift project; no backend, no
 accounts, no uploads.
 
-**Status (Nov 25, 2026): milestones 1 to 4 of 7 built, 5 and 6 under way.** The dashboard shows clearly labeled
+**Status (Nov 27, 2026): milestones 1 to 5 of 7 built, 6 under way.** The dashboard shows clearly labeled
 sample data. The camera check is real and measures frame timing. Flash detection works on simulated flashes and
-stays quiet on a still real camera. An LED test light now exists, and on the phone the app counted 30 of 30 of its
-100 ms flashes with no false hits, in one run (see "First real flashes"). Shorter flashes and a real laser are
+stays quiet on a still real camera. With an LED test light, the app on the phone counted 30 of 30 flashes of
+100 ms, and in a sweep of shorter ones every flash from 50 ms down to 5 ms and 19 of 20 at 2 ms, with no false
+hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser: a real cartridge is
 untested. Target calibration and ring scoring
 work on the test pattern; they have not been tried on a printed target. Nothing is saved as a session yet.
 
@@ -19,8 +20,8 @@ work on the test pattern; they have not been tried on a printed target. Nothing 
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
 | Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 29 deterministic unit tests on synthetic frames |
-| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **30 of 30 LED flashes of 100 ms counted in one run; shorter flashes and a laser untested** |
-| LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. The sweep compiles but has not been run |
+| Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
+| LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
 | Printable target: 180 mm square, 10 rings, 50 mm check bar | Built; **not yet printed and measured** |
 | Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
@@ -218,11 +219,54 @@ Changes made in response:
 - One run, one LED, one lighting condition, 100 ms flashes. It shows the whole chain works on a real red flash of
   that length. It says nothing yet about short flashes.
 
-Next: `hardware/FlashSweep` sends a 3-flash marker and then 20 flashes each of 50, 30, 20, 10, 5 and 2 ms, spaced
-1037 ms apart so they do not stay in step with the camera's 60 frames per second. Not yet run.
+### Short flashes: the LED sweep
 
-Still unknown: flashes shorter than 100 ms; how big and bright a laser dot on paper looks to this camera, which
-decides whether 1% is the right limit; the cartridge's actual pulse length.
+Nov 27, 2026, build `14e2ee1`, installed app, phone propped, bare LED. Lab settings: Source Rear camera,
+Sensitivity Normal, Dot size limit Large, no calibration. `hardware/FlashSweep` sends a 3-flash marker (100 ms)
+and then 20 flashes each of 50, 30, 20, 10, 5 and 2 ms, 1037 ms apart so they do not stay in step with the camera's
+frames. 123 flashes over 143 seconds; the run was 9422 frames (~157 s). The report gives a time for every hit, and
+each hit was matched to the sketch's schedule by that time.
+
+| Flash length | Sent | Hits | Frames per hit | Lit area (pixels of 182,080) |
+|---|---|---|---|---|
+| 100 ms (marker) | 3 | **3** | 6 | 4395 to 4685 |
+| 50 ms | 20 | **20** | 3 or 4 | 4362 to 4766 |
+| 30 ms | 20 | **20** | 2 or 3 | 2501 to 4566 |
+| 20 ms | 20 | **20** | 2 | 2144 to 5201 |
+| 10 ms | 20 | **20** | 1 or 2 | 636 to 2447 |
+| 5 ms | 20 | **20** | 1 or 2 | 277 to 1154 |
+| 2 ms | 20 | **19** | 1 | 147 to 329 |
+| All | 123 | **122** | | |
+
+- **No false hits.** Every one of the 122 hits falls on a scheduled flash; nothing was counted in the pauses
+  between sets or in the 12 seconds after the last flash. The camera missed no frames (59.87 fps).
+- **One 2 ms flash was missed**, the fifth of that set. Nine flashes later another 2 ms flash was only just
+  caught (147 pixels, half the usual area, and about three quarters of the usual brightness). See the next point
+  for why nine.
+- **The flashes did step through the camera's frame cycle, but more slowly than designed.** The phone delivers a
+  frame every 16.70 ms, not 16.67, so each flash moved roughly 1.5 to 2 ms along the cycle instead of 3.7 ms. In
+  the 10, 5 and 2 ms sets the lit area rises and falls in a pattern that repeats about every 9 flashes, so each
+  set of 20 covered the whole cycle about twice. The miss and the near-miss are one repeat apart, so there is a
+  point in the cycle, a few milliseconds wide, where a 2 ms flash from this LED is weak or lost. Whether that is
+  a gap between exposures or the flash being split across two frames was not determined.
+- **A shorter flash looks smaller and dimmer, not just briefer.** The camera adds up light over each frame, so a
+  2 ms flash lit about 300 pixels where a 50 ms flash lit about 4500. Detection of a short flash therefore
+  depends on how bright the light is, which is exactly what differs between this LED and a laser.
+- **The reported position moved with flash length.** Long flashes were placed at about (0.49, 0.54), the centre
+  of the LED plus everything it lit up; 2 ms flashes at (0.50, 0.51), the LED itself. That is 3.5% of the
+  picture's height. A position is the weighted centre of everything that lit up, so glow pulls it. Whether a
+  laser dot on paper has enough glow for this to matter is unknown.
+- The marker flashes lit about 2.5% of the view here against 0.4% in run 3, with the same LED. The Normal 1% limit
+  would have thrown the longer flashes away.
+- **The start-of-run artefact came back.** In the first 0.8 seconds, before any flash, 7 frames were flagged as
+  movement and a red spot at the LED's position was rejected for staying lit over 400 ms. Nothing was counted.
+  Same pattern as run 3, so it is not chance. The unlit LED has a red body; the camera settling after it starts
+  is the likely cause, not confirmed. A shorter-lived version of this could be counted as a hit, so the detector
+  should not count anything in its first second or so. Not yet done.
+- One run, one LED, one distance, one lighting condition.
+
+Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
+limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
 
 ## How detection works
 
@@ -321,6 +365,6 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 2. ~~Camera permission flow, preview, frame telemetry~~ (iPhone run pending)
 3. ~~Simulation: controllable synthetic flashes and deterministic detection fixtures~~ (full-frame-rate run pending)
 4. ~~Calibration: four-corner overlay, homography, known-point tests~~ (printed-target run pending)
-5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms counted (short-flash sweep and a dot-sized light still to run)
+5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms and 122 of 123 in the short-flash sweep counted (a dot-sized light still to run)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
 7. Sessions, IndexedDB, history, offline service worker, printable guide and QR card

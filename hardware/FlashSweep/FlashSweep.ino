@@ -11,7 +11,9 @@
 // and 1000 ms is exactly 60 frames. Flashing once a second would hit the same
 // point in the camera's frame cycle every time, so a short flash would be
 // caught every time or missed every time by luck. 1037 ms moves each flash
-// 3.67 ms along the cycle, so a set of 20 samples it evenly.
+// along the cycle, so a set of 20 samples it: by 3.67 ms per flash at exactly
+// 60 fps, and by roughly 1.5 to 2 ms on the iPhone measured on 2026-11-27,
+// whose frames arrive every 16.70 ms (the pattern repeated about every 9 flashes).
 //
 // Nothing is sent over serial on purpose: sending blinks the board's own TX
 // light, which the camera could see. The counts are fixed instead.
