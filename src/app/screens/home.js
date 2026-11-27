@@ -95,6 +95,12 @@ export function homeScreen(root) {
         ${icons.forward}
       </a>
 
+      <a class="row-link" href="#/welcome">
+        ${icons.info}
+        <span class="row-link__text">Welcome and safety<small>What the app does, and the safety reminder</small></span>
+        ${icons.forward}
+      </a>
+
       ${buildFooterHtml}
     </main>`;
 

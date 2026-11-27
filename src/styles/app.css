@@ -975,6 +975,22 @@ details.card[open] > summary {
   margin-top: 0;
 }
 
+/* ---------- Welcome ---------- */
+
+/* The safety card: set apart by its border and its warning icon, not by colour alone. */
+.card--notice {
+  border: 2px solid var(--hit);
+}
+.card--notice .card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+}
+.card--notice .card__title .icon {
+  color: var(--hit);
+}
+
 /* ---------- Trend charts (History) ---------- */
 
 .trend__count {

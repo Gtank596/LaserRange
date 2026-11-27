@@ -12,9 +12,10 @@ hits (one run each; see "First real flashes" and "Short flashes"). An LED is not
 untested. Target calibration and ring scoring
 work on the test pattern; they have not been tried on a printed target. Live sessions, on-device saving and
 History are built. Two sessions have been run on the phone against the LED sweep, the second one with no
-connection: 123 of 123 flashes counted each time, saved, and read back from History. Pause and History's trend
-charts are built and checked in a desktop browser only. A scored session (with a calibration on a printed target)
-has not been run.
+connection: 123 of 123 flashes counted each time, saved, and read back from History. A third session tried
+pause on the phone: the nine flashes sent during the pause and the warm-up after it were left out, as intended.
+History's trend charts and the first-run welcome with its safety reminder are built and checked in a desktop
+browser only. A scored session (with a calibration on a printed target) has not been run.
 
 ## What works today
 
@@ -31,11 +32,12 @@ has not been run.
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
 | Live session: counts each flash once, places it on the target and scores it when a calibration is in use, asks the phone to keep its screen awake | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
-| Pause and resume: counting and the session clock stop, the camera stays open, and resuming starts with the 2-second warm-up again | Built; 6 unit tests on the clock. In a desktop browser on the test pattern the clock stood still while paused, nothing was counted, and hits were counted again after resuming. **Not tried on the iPhone** |
+| Pause and resume: counting and the session clock stop, the camera stays open, and resuming starts with the 2-second warm-up again | Built; 6 unit tests on the clock. In a desktop browser on the test pattern the clock stood still while paused, nothing was counted, and hits were counted again after resuming. Run once on the iPhone (see "A paused session on the phone") |
 | Saved sessions (IndexedDB on the device) and History: list, one session in full, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone two sessions were saved and exported from History. **Whether they survive closing the app or restarting the phone is not recorded** |
 | Trend charts in History: accuracy, group size and hits per session, oldest to newest, simulated sessions left out | Built; 13 unit tests on which sessions go into which chart and where the points are drawn. Checked in a desktop browser with made-up records, since removed. **Not seen on the iPhone, and never with real scored sessions** |
 | Offline use: a service worker keeps a copy of each build on the device; opening the app asks the network first and falls back to the saved copy; the home screen shows whether a copy is saved | Built; 5 unit tests on how the file list is made. In a desktop browser with the server switched off, the built app reloaded, ran and saved a test-pattern session, and showed History. On the iPhone it was reported working, and a camera session was run and saved with no connection (see "A session with no connection") |
-| First-run welcome with the safety reminder, printable guide, QR card | Not built |
+| First-run welcome: what the app does, the safety reminder, what to expect from the camera prompt. Shown in place of every screen until acknowledged on the device, and readable again from the dashboard | Built; 6 unit tests on remembering the acknowledgement. Checked in a desktop browser. **Not seen on the iPhone** |
+| Printable guide, QR card | Not built |
 
 ## Setup (Windows 11)
 
@@ -330,6 +332,35 @@ and run a session with Source Rear camera, Sensitivity Normal, Dot size limit La
 - Not reported back: which of the steps were done exactly as asked, what the home screen's offline label and the
   session's screen-awake line said, and whether the earlier session was still in History.
 
+### A paused session on the phone
+
+Nov 27, 2026, build `cc4e036`. Session screen, Source Rear camera, Sensitivity Normal, Dot size limit Large, no
+calibration, `hardware/FlashSweep`. The session was paused once, part of the way through the 50 ms set, for
+7.5 seconds, and exported from History.
+
+| Flash length | Sent | Hits | Not counted |
+|---|---|---|---|
+| 100 ms (marker) | 3 | **3** | |
+| 50 ms | 20 | **11** | 9, sent during the pause or the 2-second warm-up after it |
+| 30, 20, 10 and 5 ms | 20 each | **20 each** | |
+| 2 ms | 20 | **19** | 1 missed |
+| All | 123 | **113** | |
+
+- Pause did what it should. Flashes 1 to 4 of the 50 ms set were counted, the next nine were not, and counting
+  picked up again with flash 14. The gap between the last hit before and the first hit after is 10.4 s, the
+  right size for a 7.5 s pause plus the 2 s warm-up.
+- The clock is right: length 153.0 s plus 7.5 s paused is 160.4 s, the same as the time between the saved start
+  and end. After the pause the hits still land on their scheduled flashes, to within about one video frame,
+  once the pause is taken out (checked at the start and end of each set, not hit by hit).
+- The camera stayed open through the pause and carried on afterwards.
+- One 2 ms flash was missed (the 13th), and the 4th, nine flashes earlier, was the only weak one of the run.
+  The first lab sweep showed the same thing: its miss and its weak flash were also nine flashes apart. The
+  flashes step through the camera's frame cycle and come back to the same place about every nine flashes, so
+  there looks to be a short part of each frame cycle where a 2 ms flash is mostly not seen. Over four runs the
+  2 ms set is 78 of 80.
+- This matters for the laser: if the cartridge's pulse is only a few milliseconds, an occasional miss of this
+  kind should be expected at 60 frames a second. The pulse length is still not known.
+
 Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
 limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
 
@@ -391,8 +422,8 @@ score, and distances can later be given in millimetres.
 - **Offline use on the iPhone.** Reported working once, with a camera session run and saved (see "A session with
   no connection"). Not checked: how long the iPhone keeps the saved copy, Safari as opposed to the home-screen
   app, and picking up a new build after a spell offline.
-- **Pause on the iPhone.** Checked in a desktop browser only. The camera stays open during a pause; whether the
-  iPhone leaves it open for a long pause has not been tried. Locking the phone still ends the session.
+- **Pause on the iPhone.** Worked for one 7.5-second pause. Whether the iPhone leaves the camera open for a
+  pause of several minutes has not been tried. Locking the phone still ends the session.
 - **Keeping the screen awake.** A session asks the phone not to lock, because a locked phone stops the camera and
   ends the session. Whether the iPhone grants this, in Safari and as a home-screen app, has not been checked. The
   session screen says whether it was granted.
@@ -417,7 +448,7 @@ public/                 manifest and icons (PNG icons generated by scripts/make-
 scripts/make-icons.mjs  dependency-free icon generator: npm run icons
 src/
   main.js               entry: routes -> screens
-  app/                  router, shared state, build label, wake lock, screens (home, session, history, calibrate, print, camera, lab)
+  app/                  router, shared state, build label, wake lock, the first-run welcome's memory, screens (welcome, home, session, history, calibrate, print, camera, lab)
   camera/               stream, video session, frame loop, frame statistics, pixel sampler, feature probe, error messages
   detection/            frame detector, region finder, hit grouping, settings, scoring against ground truth
   calibration/          perspective mapping, target definitions and printable sheet, ring scoring, saved calibration
@@ -458,5 +489,5 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms and 122 of 123 in the short-flash sweep counted (a dot-sized light still to run)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
 7. ~~Sessions, IndexedDB, history, trend charts, pause, offline service worker~~ (a scored session, pause and
-   the charts still to try on the phone); still to build: first-run welcome with the safety reminder, printable
-   guide and QR card
+   the charts still to try on the phone), ~~first-run welcome with the safety reminder~~; still to build:
+   printable guide and QR card

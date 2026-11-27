@@ -7,6 +7,8 @@ import { homeScreen } from './app/screens/home.js';
 import { labScreen } from './app/screens/lab.js';
 import { printScreen } from './app/screens/print.js';
 import { sessionScreen } from './app/screens/session.js';
+import { welcomeScreen } from './app/screens/welcome.js';
+import { hasSeenWelcome } from './app/welcome.js';
 import { registerServiceWorker } from './pwa/register.js';
 
 registerServiceWorker();
@@ -20,4 +22,9 @@ startRouter(document.getElementById('app'), {
   session: sessionScreen,
   // #/history is the list; #/history/<id> is one session.
   history: (root, id) => (id ? sessionDetailScreen(root, id) : historyScreen(root)),
+  welcome: welcomeScreen,
+}, {
+  // Until the welcome and its safety reminder have been acknowledged on this
+  // device, they are shown in place of every screen.
+  gate: () => (hasSeenWelcome() ? null : welcomeScreen),
 });
