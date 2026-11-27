@@ -1,5 +1,5 @@
-// In-memory app state shared between screens. Deliberately tiny: persistence
-// (IndexedDB) arrives with sessions in milestone 7.
+// In-memory app state shared between screens. Deliberately tiny: saved
+// sessions live in IndexedDB (sessions/store.js), not here.
 
 import { loadCalibration } from '../calibration/store.js';
 
@@ -16,4 +16,11 @@ export const appState = {
    * @type {null | { source: string, observedFps: number | null, width: number, height: number, at: string }}
    */
   cameraCheck: null,
+
+  /**
+   * Choices made on the session screen, kept for the next session in this
+   * page load. Defaults are the everyday ones.
+   * @type {{ source: 'environment' | 'synthetic', redDelta: number, dotLimit: 'normal' | 'large' }}
+   */
+  sessionOptions: { source: 'environment', redDelta: 60, dotLimit: 'normal' },
 };

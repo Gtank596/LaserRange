@@ -60,6 +60,15 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
 });
 
 /**
+ * How big a lit area may be and still count as a dot. "large" is for testing
+ * with a bare LED, which lights up its surroundings as well as itself.
+ */
+export const DOT_LIMITS = Object.freeze({
+  normal: Object.freeze({ maxAreaFraction: 0.01, maxCandidateFraction: 0.03 }),
+  large: Object.freeze({ maxAreaFraction: 0.05, maxCandidateFraction: 0.1 }),
+});
+
+/**
  * Rough 0-1 signal strength for an accepted hit: how far its brightest pixel
  * rose above the threshold. A heuristic for display, not a probability.
  */

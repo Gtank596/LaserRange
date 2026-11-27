@@ -7,7 +7,7 @@ import { createFrameGrabber } from '../../camera/frameSampler.js';
 import { createFrameStats, summarize } from '../../camera/frameStats.js';
 import { buildConstraints, openCamera, stopStream } from '../../camera/stream.js';
 import { matchEvents } from '../../detection/matchEvents.js';
-import { confidenceWord } from '../../detection/params.js';
+import { confidenceWord, DOT_LIMITS } from '../../detection/params.js';
 import { createFlashPipeline } from '../../detection/pipeline.js';
 import { createSyntheticSource } from '../../simulation/syntheticSource.js';
 import { icons } from '../../ui/icons.js';
@@ -45,12 +45,6 @@ const IGNORED_TEXT = {
   large: 'lit area too big to be a dot',
   motion: 'movement in view',
   unstable: 'too much of the picture changed',
-};
-
-// "Large" is for a bare LED, which lights up its surroundings as well as itself.
-const DOT_LIMITS = {
-  normal: { maxAreaFraction: 0.01, maxCandidateFraction: 0.03 },
-  large: { maxAreaFraction: 0.05, maxCandidateFraction: 0.1 },
 };
 
 export function labScreen(root) {

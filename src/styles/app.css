@@ -873,7 +873,113 @@ details.card[open] > summary {
   white-space: nowrap;
 }
 
+/* --- sessions ----------------------------------------------------------- */
+/* A group of blocks spaced like the screen itself, so a whole state of a
+   screen can be shown or hidden as one. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.stack[hidden] {
+  display: none;
+}
+.tag--plain {
+  border-color: var(--border-strong);
+  color: var(--text-2);
+}
+.card__head .tag + .tag {
+  margin-left: var(--space-2);
+}
+.scene {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--hit);
+  border-radius: var(--radius-s);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.scene .icon {
+  color: var(--hit);
+}
+.scene--ok {
+  border: 1px solid var(--accent);
+}
+.scene--ok .icon {
+  color: var(--accent);
+}
+.last-hit {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.stat.is-pulsing {
+  animation: hit-pulse 500ms ease-out;
+}
+@keyframes hit-pulse {
+  0% {
+    border-color: var(--hit);
+    box-shadow: 0 0 0 4px rgba(243, 166, 94, 0.35);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: 0 0 0 0 rgba(243, 166, 94, 0);
+  }
+}
+/* A smaller camera view, for when the target drawing shares the screen. */
+.preview--compact {
+  width: min(100%, calc(34dvh * var(--ar, 1.3333)));
+}
+.hit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.hit-table th {
+  padding: 0 var(--space-2) var(--space-2) 0;
+  color: var(--text-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+}
+.hit-table td {
+  padding: 6px var(--space-2) 6px 0;
+  border-top: 1px solid var(--border);
+}
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+.row-link__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.row-link__tags:empty {
+  display: none;
+}
+.banner a,
+.checklist a,
+.fine-print a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.readiness {
+  margin-top: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .stat.is-pulsing {
+    animation: none;
+    border-color: var(--hit);
+  }
   * {
     transition: none !important;
   }
