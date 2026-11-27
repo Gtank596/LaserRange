@@ -1,4 +1,5 @@
 /* global __BUILD_ID__ */
+import { checkForNewServiceWorker } from '../pwa/register.js';
 
 /** Commit id and build time of this copy of the app ("dev" on the dev server). */
 export const BUILD_ID = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev';
@@ -23,9 +24,12 @@ export function attachBuildFooter(root) {
     button.disabled = true;
     button.textContent = 'Checking…';
     try {
-      // cache: 'reload' skips the saved copy and replaces it with a fresh one,
-      // so the reload that follows picks up the newest build.
+      // cache: 'reload' skips every saved copy (the browser's and the offline
+      // one) and fails when there is no connection, so "Offline" below is true.
       await fetch(window.location.pathname, { cache: 'reload' });
+      // Also fetch the newest offline copy, then reload: opening the page asks
+      // the network first, so the reload shows the newest build.
+      await checkForNewServiceWorker();
       window.location.reload();
     } catch {
       button.disabled = false;

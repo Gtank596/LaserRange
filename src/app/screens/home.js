@@ -5,6 +5,7 @@ import { getSessionStore } from '../../sessions/store.js';
 import { icons } from '../../ui/icons.js';
 import { formatWhen, sessionMapHtml, sessionStatsHtml } from '../../ui/sessionView.js';
 import { targetLegendHtml, targetOverlaySvg } from '../../ui/targetOverlay.js';
+import { offlineState, onOfflineReady } from '../../pwa/register.js';
 import { attachBuildFooter, buildFooterHtml } from '../build.js';
 import { appState } from '../state.js';
 
@@ -68,6 +69,7 @@ export function homeScreen(root) {
             ? `<li class="chip chip--ok">${icons.check}Calibration saved</li>`
             : `<li class="chip">${icons.circle}Not calibrated</li>`
         }
+        <li class="chip" id="home-offline" hidden></li>
       </ul>
 
       <nav class="actions" aria-label="Main actions">
@@ -109,7 +111,20 @@ export function homeScreen(root) {
       if (!disposed) summaryEl.innerHTML = latest ? latestHtml(latest) : sampleHtml();
     });
 
+  // Whether a copy of the app is saved on this device for use without a connection.
+  const offlineChip = root.querySelector('#home-offline');
+  const showOffline = async () => {
+    const state = await offlineState();
+    if (disposed || state === 'unsupported') return;
+    offlineChip.hidden = false;
+    offlineChip.className = state === 'ready' ? 'chip chip--ok' : 'chip';
+    offlineChip.innerHTML = state === 'ready' ? `${icons.check}Saved for offline use` : `${icons.circle}Offline copy not ready yet`;
+  };
+  showOffline();
+  const stopWatching = onOfflineReady(showOffline);
+
   return () => {
     disposed = true;
+    stopWatching();
   };
 }

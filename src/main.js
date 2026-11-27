@@ -7,6 +7,9 @@ import { homeScreen } from './app/screens/home.js';
 import { labScreen } from './app/screens/lab.js';
 import { printScreen } from './app/screens/print.js';
 import { sessionScreen } from './app/screens/session.js';
+import { registerServiceWorker } from './pwa/register.js';
+
+registerServiceWorker();
 
 startRouter(document.getElementById('app'), {
   '': homeScreen,
