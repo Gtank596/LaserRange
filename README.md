@@ -11,8 +11,10 @@ stays quiet on a still real camera. With an LED test light, the app on the phone
 hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser: a real cartridge is
 untested. Target calibration and ring scoring
 work on the test pattern; they have not been tried on a printed target. Live sessions, on-device saving and
-History are built. One session has been run on the phone, against the LED sweep: 123 of 123 flashes counted,
-saved, and read back from History. A scored session (with a calibration on a printed target) has not been run.
+History are built. Two sessions have been run on the phone against the LED sweep, the second one with no
+connection: 123 of 123 flashes counted each time, saved, and read back from History. Pause and History's trend
+charts are built and checked in a desktop browser only. A scored session (with a calibration on a printed target)
+has not been run.
 
 ## What works today
 
@@ -28,10 +30,12 @@ saved, and read back from History. A scored session (with a calibration on a pri
 | Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
-| Live session: counts each flash once, places it on the target and scores it when a calibration is in use, asks the phone to keep its screen awake | Built; run on the test pattern in a desktop browser, with and without a calibration, and once on the iPhone without a calibration (see "A session on the phone"). **A scored session on a printed target has not been run** |
-| Saved sessions (IndexedDB on the device) and History: list, one session in full, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone one session was saved and exported from History. **Whether it survives closing the app or restarting the phone is not recorded** |
-| Offline use: a service worker keeps a copy of each build on the device; opening the app asks the network first and falls back to the saved copy; the home screen shows whether a copy is saved | Built; 5 unit tests on how the file list is made. In a desktop browser with the server switched off, the built app reloaded, ran and saved a test-pattern session, and showed History. **Not yet tried on the iPhone (airplane mode, home-screen app, camera)** |
-| Trend charts, pause, printable guide, QR card | Not built |
+| Live session: counts each flash once, places it on the target and scores it when a calibration is in use, asks the phone to keep its screen awake | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
+| Pause and resume: counting and the session clock stop, the camera stays open, and resuming starts with the 2-second warm-up again | Built; 6 unit tests on the clock. In a desktop browser on the test pattern the clock stood still while paused, nothing was counted, and hits were counted again after resuming. **Not tried on the iPhone** |
+| Saved sessions (IndexedDB on the device) and History: list, one session in full, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone two sessions were saved and exported from History. **Whether they survive closing the app or restarting the phone is not recorded** |
+| Trend charts in History: accuracy, group size and hits per session, oldest to newest, simulated sessions left out | Built; 13 unit tests on which sessions go into which chart and where the points are drawn. Checked in a desktop browser with made-up records, since removed. **Not seen on the iPhone, and never with real scored sessions** |
+| Offline use: a service worker keeps a copy of each build on the device; opening the app asks the network first and falls back to the saved copy; the home screen shows whether a copy is saved | Built; 5 unit tests on how the file list is made. In a desktop browser with the server switched off, the built app reloaded, ran and saved a test-pattern session, and showed History. On the iPhone it was reported working, and a camera session was run and saved with no connection (see "A session with no connection") |
+| First-run welcome with the safety reminder, printable guide, QR card | Not built |
 
 ## Setup (Windows 11)
 
@@ -300,6 +304,32 @@ and was exported from History as JSON.
   Auto-Lock setting was not recorded.
 - Saving and History work on the iPhone for this one session. Closing and reopening the app was not recorded.
 
+### A session with no connection
+
+Nov 27, 2026, build `275b675`, the first build that keeps a copy of itself on the phone. The test asked for:
+open the app online once, close it, turn on Airplane Mode with Wi-Fi off, open it again from the home screen,
+and run a session with Source Rear camera, Sensitivity Normal, Dot size limit Large, no calibration, against
+`hardware/FlashSweep`. Gabriel reported that offline worked and sent the session exported from History.
+
+| Flash length | Sent | Hits |
+|---|---|---|
+| 100 ms (marker) | 3 | **3** |
+| 50, 30, 20, 10 and 5 ms | 20 each | **20 each** |
+| 2 ms | 20 | **20** |
+| All | 123 | **123** |
+
+- The camera opened and the session was saved with no connection: the export exists, with `source` set to the
+  rear camera and build `275b675`.
+- Every hit falls on a scheduled flash. The first marker flash came 3.0 s into the session, one second after the
+  warm-up ended, and was counted.
+- The 2 ms set has now been 19, 20 and 20 of 20 in three runs: 59 of 60.
+- The reported position moved more than before: the three 100 ms markers sit about 5.5% of the picture's height
+  away from the 50 ms flashes, and the shortest flashes fall in between. This is a bare LED with a glow around
+  it, so it says little about a small dot on paper, but it is a reminder that position has only been checked on
+  the test pattern.
+- Not reported back: which of the steps were done exactly as asked, what the home screen's offline label and the
+  session's screen-awake line said, and whether the earlier session was still in History.
+
 Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
 limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
 
@@ -358,8 +388,11 @@ score, and distances can later be given in millimetres.
 - **Saved sessions staying saved.** Sessions are in the browser's own on-device database. Safari can clear a
   website's storage after weeks without a visit; an app on the home screen is treated more generously. Not yet
   checked on the iPhone: closing and reopening the app, and a restart of the phone.
-- **Offline use on the iPhone.** Checked in a desktop browser only. Whether the iPhone keeps the saved copy, in
-  Safari and as a home-screen app, and whether the camera opens with no connection, has not been tried.
+- **Offline use on the iPhone.** Reported working once, with a camera session run and saved (see "A session with
+  no connection"). Not checked: how long the iPhone keeps the saved copy, Safari as opposed to the home-screen
+  app, and picking up a new build after a spell offline.
+- **Pause on the iPhone.** Checked in a desktop browser only. The camera stays open during a pause; whether the
+  iPhone leaves it open for a long pause has not been tried. Locking the phone still ends the session.
 - **Keeping the screen awake.** A session asks the phone not to lock, because a locked phone stops the camera and
   ends the session. Whether the iPhone grants this, in Safari and as a home-screen app, has not been checked. The
   session screen says whether it was granted.
@@ -388,10 +421,10 @@ src/
   camera/               stream, video session, frame loop, frame statistics, pixel sampler, feature probe, error messages
   detection/            frame detector, region finder, hit grouping, settings, scoring against ground truth
   calibration/          perspective mapping, target definitions and printable sheet, ring scoring, saved calibration
-  sessions/             session records and totals, on-device storage (IndexedDB), sample data for the empty dashboard
+  sessions/             session records and totals, the session clock (pauses left out), trend numbers for History, on-device storage (IndexedDB), sample data for the empty dashboard
   pwa/                  service worker template, the build step that fills it in, registration
   simulation/           test-pattern video source, synthetic frames for tests, illustrative exposure model
-  ui/                   icons, target overlay, session summary
+  ui/                   icons, target overlay, session summary, trend charts
   styles/               design tokens and app styles
 ```
 
@@ -408,6 +441,11 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 - **Not scored**: a session run without a calibration. Hits are counted and their place in the picture is kept;
   no score, accuracy or group size is given.
 - **Simulated**: a session run on the test pattern. It is saved and labeled as simulated wherever it appears.
+- **Length and hit times**: time spent watching. Pauses are left out of both, and the total time paused is
+  saved separately.
+- **Trend charts**: one point per saved session, oldest on the left, each chart on its own scale starting at
+  zero. Simulated sessions are left out; accuracy and group size use scored sessions only; a chart needs two
+  sessions; the latest 20 are drawn.
 - A session is saved automatically when it ends with at least one hit, and can be deleted afterwards. A session
   with no hits is not saved.
 
@@ -419,5 +457,6 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 4. ~~Calibration: four-corner overlay, homography, known-point tests~~ (printed-target run pending)
 5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms and 122 of 123 in the short-flash sweep counted (a dot-sized light still to run)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
-7. ~~Sessions, IndexedDB, history, offline service worker~~ (scored session and offline use still to try on the
-   phone); still to build: trend charts, pause, printable guide and QR card
+7. ~~Sessions, IndexedDB, history, trend charts, pause, offline service worker~~ (a scored session, pause and
+   the charts still to try on the phone); still to build: first-run welcome with the safety reminder, printable
+   guide and QR card

@@ -12,6 +12,7 @@ export const icons = {
   info: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.3v.2"/>'),
   play: stroke('<path d="M7 4.5v15l12-7.5-12-7.5z" fill="currentColor"/>'),
   stop: stroke('<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/>'),
+  pause: stroke('<rect x="6.5" y="5.5" width="3.5" height="13" rx="1" fill="currentColor"/><rect x="14" y="5.5" width="3.5" height="13" rx="1" fill="currentColor"/>'),
   clock: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>'),
   camera: stroke('<path d="M3 8.5a2 2 0 0 1 2-2h2.2l1.4-2h6.8l1.4 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5z"/><circle cx="12" cy="13" r="3.6"/>'),
   back: stroke('<path d="M15 5l-7 7 7 7"/>'),

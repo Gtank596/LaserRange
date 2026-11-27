@@ -103,7 +103,7 @@ export function sessionSummaryHtml(session) {
       <div class="card__head"><h2 class="card__title">Details</h2></div>
       <dl class="metrics">
         <div class="metric metric--wide"><dt>Started</dt><dd>${formatWhen(session.startedAt)}</dd></div>
-        <div class="metric"><dt>Length</dt><dd>${formatClock(session.durationMs)}</dd></div>
+        <div class="metric"><dt>Length</dt><dd>${formatClock(session.durationMs)}${session.pausedMs >= 1000 ? ` <small>plus ${formatClock(session.pausedMs)} paused</small>` : ''}</dd></div>
         <div class="metric"><dt>On the rings</dt><dd>${summary.scored ? `${summary.onTarget} of ${summary.hits}` : '–'}</dd></div>
         <div class="metric metric--wide"><dt>Group size</dt><dd>${group}</dd></div>
         <div class="metric"><dt>Source</dt><dd>${session.simulated ? 'Test pattern' : 'Rear camera'}</dd></div>

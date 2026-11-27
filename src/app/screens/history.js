@@ -1,7 +1,9 @@
 import { summarizeSession } from '../../sessions/metrics.js';
 import { getSessionStore } from '../../sessions/store.js';
+import { buildTrends, MIN_TREND_POINTS } from '../../sessions/trends.js';
 import { icons } from '../../ui/icons.js';
 import { formatClock, formatWhen, sessionSummaryHtml, sessionTagsHtml } from '../../ui/sessionView.js';
+import { attachTrendCharts, trendCardHtml } from '../../ui/trendChart.js';
 
 // Saved sessions: the list, and one session in full. Everything shown here is
 // read from this device's own storage.
@@ -19,6 +21,23 @@ function listLine(session) {
   const hits = `${summary.hits} hit${summary.hits === 1 ? '' : 's'}`;
   const score = summary.scored ? ` · ${summary.score} of ${summary.maxScore} points` : '';
   return `${hits}${score} · ${formatClock(session.durationMs)}`;
+}
+
+/** The trend charts, plus a plain note about what is missing from them and why. */
+function trendsHtml(sessions, { trends, simulatedLeftOut }) {
+  const real = sessions.length - simulatedLeftOut;
+  const notes = [];
+  if (real < MIN_TREND_POINTS) {
+    notes.push(`Trend charts appear here once ${MIN_TREND_POINTS} sessions are saved${simulatedLeftOut ? ', not counting simulated ones' : ''}.`);
+  } else if (!trends.some((trend) => trend.key === 'accuracy')) {
+    notes.push('Accuracy and group size charts appear once two sessions have been run with a target calibration.');
+  }
+  if (simulatedLeftOut && trends.length) {
+    notes.push(`${simulatedLeftOut} simulated session${simulatedLeftOut === 1 ? ' is' : 's are'} left out of the charts.`);
+  }
+  return `
+    ${trends.map(trendCardHtml).join('')}
+    ${notes.length ? `<p class="fine-print">${notes.join(' ')}</p>` : ''}`;
 }
 
 export function historyScreen(root) {
@@ -45,7 +64,9 @@ export function historyScreen(root) {
           <a class="btn btn--primary btn--block" href="#/session">${icons.play}Start session</a>`;
         return;
       }
+      const trendData = buildTrends(sessions);
       body.innerHTML = `
+        ${trendsHtml(sessions, trendData)}
         <p class="fine-print">${sessions.length} session${sessions.length === 1 ? '' : 's'} saved on this device, newest first.</p>
         <ul class="session-list">
           ${sessions
@@ -61,6 +82,7 @@ export function historyScreen(root) {
             )
             .join('')}
         </ul>`;
+      attachTrendCharts(body, trendData.trends);
     })
     .catch((error) => {
       if (!disposed) body.innerHTML = storageProblemHtml(error);

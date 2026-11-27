@@ -975,6 +975,81 @@ details.card[open] > summary {
   margin-top: 0;
 }
 
+/* ---------- Trend charts (History) ---------- */
+
+.trend__count {
+  color: var(--text-2);
+  font-size: 0.8rem;
+}
+.trend__headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+}
+.trend__headline strong {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.trend__headline span {
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+.trend__plot {
+  margin-top: var(--space-2);
+  border-radius: var(--radius-s);
+  /* Sideways drags move along the chart; up and down still scrolls the page. */
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.trend__plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.trend__grid {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.trend__cross {
+  stroke: var(--text-2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.trend__axis {
+  fill: var(--text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.trend__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trend__dot {
+  fill: var(--accent);
+  /* A ring in the card's own colour keeps each dot clear of the line. */
+  stroke: var(--card);
+  stroke-width: 2;
+}
+.trend__readout {
+  min-height: 1.45em;
+  margin-top: var(--space-2);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.trend__readout a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.trend .fine-print {
+  margin-top: var(--space-2);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stat.is-pulsing {
     animation: none;

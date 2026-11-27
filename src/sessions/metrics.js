@@ -11,7 +11,7 @@ import { getTarget } from '../calibration/targets.js';
 
 /**
  * @typedef {object} SessionHit
- * @property {number} tMs        time since the session started
+ * @property {number} tMs        watching time since the session started (pauses left out)
  * @property {number} x          position in the picture, 0-1 across
  * @property {number} y          position in the picture, 0-1 down
  * @property {number} [targetX]  position on the target (scored sessions only)
@@ -27,7 +27,8 @@ import { getTarget } from '../calibration/targets.js';
  * @property {1} schema
  * @property {string} startedAt   ISO time
  * @property {string} endedAt     ISO time
- * @property {number} durationMs
+ * @property {number} durationMs  time spent watching: pauses are left out
+ * @property {number} [pausedMs]  total time paused (absent in sessions saved before pause existed)
  * @property {'environment' | 'synthetic'} source
  * @property {boolean} simulated  true for the test pattern: not a real camera session
  * @property {boolean} scored     a calibration was in use

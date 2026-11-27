@@ -6,6 +6,7 @@ import { createFrameGrabber } from '../../camera/frameSampler.js';
 import { startVideoSession } from '../../camera/videoSession.js';
 import { confidenceWord, DOT_LIMITS } from '../../detection/params.js';
 import { createFlashPipeline } from '../../detection/pipeline.js';
+import { createSessionClock } from '../../sessions/clock.js';
 import { newSessionId, summarizeSession } from '../../sessions/metrics.js';
 import { getSessionStore } from '../../sessions/store.js';
 import { icons } from '../../ui/icons.js';
@@ -32,6 +33,7 @@ const TEST_PATTERN = { flashEveryMs: 1200, flashMs: 50, flashIntensity: 1 };
 const SCENE = {
   ok: { ok: true, text: 'Watching for hits' },
   warming: { ok: false, text: 'Starting: nothing is counted for 2 seconds' },
+  paused: { ok: false, text: 'Paused: nothing is being counted' },
   motion: { ok: false, text: 'Movement in view: not counting' },
   large: { ok: false, text: 'Something lit is too big to be a hit' },
   unstable: { ok: false, text: 'The picture changed: settling' },
@@ -109,7 +111,10 @@ export function sessionScreen(root) {
           <canvas class="preview__overlay" id="s-overlay" aria-hidden="true"></canvas>
         </div>
         <p class="fine-print" id="s-awake"></p>
-        <button class="btn btn--stop btn--block" id="s-stop" type="button">${icons.stop}End session</button>
+        <div class="actions">
+          <button class="btn btn--secondary" id="s-pause" type="button"></button>
+          <button class="btn btn--stop" id="s-stop" type="button">${icons.stop}End session</button>
+        </div>
       </div>
 
       <div class="stack" id="s-results" hidden>
@@ -218,13 +223,23 @@ export function sessionScreen(root) {
       scored,
       hits: [],
       startedAt: new Date(),
-      t0: null, // time of the first analysed frame; hit times count from here
+      // Starts at the first analysed frame and stands still while paused. Hit
+      // times and the session's length are read from it.
+      clock: createSessionClock(),
+      paused: false,
       scene: 'warming',
       disturbed: null, // { kind, at } of the latest frame that was not trusted
       video: opened.session,
       wake: null,
       flush: () => pipeline?.flush() ?? null,
+      // Drops what the detector has learned. The next frame builds a new one,
+      // which starts with its 2-second warm-up, so whatever changed in the
+      // picture during a pause is taken as background and not counted.
+      resetDetector: () => {
+        pipeline = null;
+      },
       stopLoop: startFrameLoop(video, (frame) => {
+        if (live.paused) return;
         const image = grabber.grab(video);
         if (!image) return;
         if (!pipeline || pipeline.width !== image.width || pipeline.height !== image.height) {
@@ -232,7 +247,7 @@ export function sessionScreen(root) {
           const mask = mapper ? buildRoiMask(calibration.corners, image.width, image.height) : null;
           pipeline = createFlashPipeline(image.width, image.height, { redDelta, ...DOT_LIMITS[dotLimit] }, { mask });
         }
-        if (live.t0 === null) live.t0 = frame.now;
+        live.clock.start(frame.now);
         const result = pipeline.process(image.data, frame.now);
         live.scene = result.status;
         if (result.status !== 'ok') live.disturbed = { kind: result.status, at: frame.now };
@@ -243,11 +258,8 @@ export function sessionScreen(root) {
     opened.session.onEnded(() => finish('ended'));
     starting = false;
 
-    setStatus(
-      'ok',
-      source === 'synthetic' ? 'Simulated session running.' : 'Session running.',
-      scored ? 'Hits are placed on the target and scored.' : 'No calibration in use: hits are counted, not scored.',
-    );
+    showRunning();
+    renderPauseButton();
     $('#s-awake').textContent = '';
     renderLive();
 
@@ -259,9 +271,47 @@ export function sessionScreen(root) {
       : 'This browser would not keep the screen awake. If the phone locks, the session ends: touch the screen now and then, or lengthen Auto-Lock in the phone’s settings.';
   }
 
+  function showRunning() {
+    setStatus(
+      'ok',
+      live.source === 'synthetic' ? 'Simulated session running.' : 'Session running.',
+      live.scored ? 'Hits are placed on the target and scored.' : 'No calibration in use: hits are counted, not scored.',
+    );
+  }
+
+  function renderPauseButton() {
+    const button = $('#s-pause');
+    const paused = Boolean(live?.paused);
+    button.className = `btn ${paused ? 'btn--primary' : 'btn--secondary'}`;
+    button.innerHTML = paused ? `${icons.play}Resume` : `${icons.pause}Pause`;
+  }
+
+  /** Pausing stops the counting and the clock; the camera stays open so resuming is instant. */
+  function setPaused(paused) {
+    if (!live || live.paused === paused) return;
+    const now = performance.now();
+    if (paused) {
+      // A flash still being followed counts if it was a hit, as at the end of a session.
+      const pending = live.flush();
+      if (pending?.accepted) addHit(pending);
+      live.clock.pause(now);
+      live.paused = true;
+      live.disturbed = null;
+      live.resetDetector();
+      setStatus('info', 'Session paused.', 'Nothing is counted until you resume. Locking the phone or leaving the app still ends the session.');
+    } else {
+      live.clock.resume(now);
+      live.paused = false;
+      live.scene = 'warming';
+      showRunning();
+    }
+    renderPauseButton();
+    renderLive();
+  }
+
   function addHit(event) {
     const hit = {
-      tMs: Math.round(event.t - live.t0),
+      tMs: Math.round(live.clock.elapsed(event.t)),
       x: round(event.x),
       y: round(event.y),
       confidence: round(event.confidence, 2),
@@ -291,11 +341,11 @@ export function sessionScreen(root) {
     const summary = summarizeSession(draftRecord());
     $('#s-hits').textContent = String(summary.hits);
     $('#s-score').textContent = summary.scored ? String(summary.score) : '–';
-    $('#s-time').textContent = live.t0 === null ? '0:00' : formatClock(performance.now() - live.t0);
+    $('#s-time').textContent = formatClock(live.clock.elapsed(performance.now()));
 
     // Hold a "not counting" state briefly so a single odd frame is still readable.
     const recent = live.disturbed && performance.now() - live.disturbed.at < SCENE_HOLD_MS ? live.disturbed.kind : null;
-    const scene = SCENE[live.scene === 'ok' && recent ? recent : live.scene] ?? SCENE.ok;
+    const scene = live.paused ? SCENE.paused : (SCENE[live.scene === 'ok' && recent ? recent : live.scene] ?? SCENE.ok);
     const sceneEl = $('#s-scene');
     sceneEl.className = `scene${scene.ok ? ' scene--ok' : ''}`;
     sceneEl.innerHTML = `${scene.ok ? icons.check : icons.info}<span></span>`;
@@ -370,13 +420,15 @@ export function sessionScreen(root) {
     session.wake?.release();
 
     const endedAt = new Date();
+    const now = performance.now();
     /** @type {import('../../sessions/metrics.js').SessionRecord} */
     const record = {
       id: newSessionId(session.startedAt.getTime()),
       schema: 1,
       startedAt: session.startedAt.toISOString(),
       endedAt: endedAt.toISOString(),
-      durationMs: session.t0 === null ? 0 : Math.round(performance.now() - session.t0),
+      durationMs: Math.round(session.clock.elapsed(now)),
+      pausedMs: Math.round(session.clock.pausedMs(now)),
       source: session.source,
       simulated: session.source === 'synthetic',
       scored: session.scored,
@@ -451,6 +503,7 @@ export function sessionScreen(root) {
 
   $('#s-start').addEventListener('click', start);
   $('#s-stop').addEventListener('click', () => finish('user'));
+  $('#s-pause').addEventListener('click', () => setPaused(!live?.paused));
   $('#s-again').addEventListener('click', () => {
     show('setup');
     renderSetup();
