@@ -29,7 +29,6 @@ export function welcomeScreen(root) {
           <li>${icons.pulse}<span>Scores your hits <small>Once the printed target has been lined up on screen, each hit is placed on the rings and scored.</small></span></li>
           <li>${icons.clock}<span>Keeps sessions on this phone <small>No account. The camera video is looked at on the phone and is never saved or sent anywhere.</small></span></li>
         </ul>
-        <p class="fine-print" style="margin-top:12px">So far detection has been measured with an LED test light, not with a laser cartridge. A hit the camera did not see cannot be counted.</p>
       </section>
 
       <section class="card card--notice" aria-labelledby="w-safety-title">

@@ -1,5 +1,6 @@
 import { buildRoiMask, createMapper } from '../../calibration/calibration.js';
 import { scoreHit } from '../../calibration/scoring.js';
+import { loadPrintScale } from '../../calibration/printScale.js';
 import { calibrationFits } from '../../calibration/store.js';
 import { startFrameLoop } from '../../camera/frameLoop.js';
 import { createFrameGrabber } from '../../camera/frameSampler.js';
@@ -221,6 +222,8 @@ export function sessionScreen(root) {
       calibration: scored ? calibration : null,
       mapper,
       scored,
+      // How big the sheet printed, from the bar measurement entered on the print screen (1 if none).
+      printScale: scored ? loadPrintScale() : 1,
       hits: [],
       startedAt: new Date(),
       // Starts at the first analysed frame and stands still while paused. Hit
@@ -333,7 +336,7 @@ export function sessionScreen(root) {
   }
 
   function draftRecord() {
-    return { hits: live.hits, scored: live.scored, targetId: live.calibration?.targetId ?? null };
+    return { hits: live.hits, scored: live.scored, targetId: live.calibration?.targetId ?? null, printScale: live.printScale };
   }
 
   function renderLive() {
@@ -433,6 +436,7 @@ export function sessionScreen(root) {
       simulated: session.source === 'synthetic',
       scored: session.scored,
       targetId: session.calibration?.targetId ?? null,
+      ...(session.scored ? { printScale: session.printScale } : {}),
       settings: session.settings,
       build: BUILD_ID,
       hits: session.hits,

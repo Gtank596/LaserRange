@@ -27,7 +27,7 @@ browser only. A scored session (with a calibration on a printed target) has not 
 | Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
-| Printable target: 180 mm square, 10 rings, 50 mm check bar | Built; **not yet printed and measured** |
+| Printable target: 180 mm square, 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm. **The new sheet has not been printed and measured** |
 | Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
@@ -408,8 +408,13 @@ score, and distances can later be given in millimetres.
 
 - **Calibration accuracy.** Checked against known points in software only. How precisely corners can be placed
   by hand on a phone, lens distortion, and a sheet that is not flat are all unmeasured.
-- **Print scale.** Ring scores do not depend on it, but millimetre figures will. The sheet has a 50 mm bar to
-  check with a ruler.
+- **Print scale.** The first print came out at 95% (the 50 mm bar measured 47.5 mm). What shrank it is not
+  known: a page cannot see the print window's or the printer's scaling, and the browser and settings used were
+  not recorded. Two things were changed in response. The sheet's drawing went from 190 x 210 mm to 183 x 183 mm
+  (the bar and caption moved inside the square), which fits inside half-inch margins on Letter and A4, so a
+  browser has less reason to shrink it. And the print screen takes the bar's measured length, which corrects
+  millimetre figures whatever the print size. Ring scores never depended on print size. Whether the new sheet
+  prints at 100% has not been checked.
 - **Detection settings.** Chosen against synthetic frames, plus one recording of an LED. The true size and
   brightness of a laser dot on paper are unmeasured, so the 1% dot size limit is a guess. With a calibration the
   limit is 1% of the target area, which is smaller still and has never been tried on a real light.
@@ -468,7 +473,8 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 - **Accuracy**: points scored / points possible for the hits that were detected. It cannot account for shots the
   camera never saw.
 - **Group size**: the widest distance between any two hits, in millimetres, taken from the target's printed size.
-  It is only right if the sheet was printed at 100%.
+  It is right if the sheet printed at 100%, or if the check bar's measured length was entered on the print screen
+  before the session (each scored session keeps the print scale it was run with).
 - **Not scored**: a session run without a calibration. Hits are counted and their place in the picture is kept;
   no score, accuracy or group size is given.
 - **Simulated**: a session run on the test pattern. It is saved and labeled as simulated wherever it appears.

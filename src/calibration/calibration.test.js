@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildRoiMask, createMapper, validateCorners } from './calibration.js';
 import { applyHomography, computeHomography, invertHomography, isConvexQuad, pointInQuad, signedArea } from './homography.js';
 import { scoreHit } from './scoring.js';
-import { getTarget, printableTargetSvg, ringShare } from './targets.js';
+import { getTarget, printableTargetSvg, ringShare, sheetSizeMm } from './targets.js';
 
 const SQUARE = [
   { x: 0, y: 0 },
@@ -159,9 +159,33 @@ describe('buildRoiMask', () => {
 describe('printableTargetSvg', () => {
   it('is sized in real millimetres with every ring drawn', () => {
     const svg = printableTargetSvg(getTarget());
-    expect(svg).toContain('width="190mm"');
-    expect(svg).toContain('viewBox="0 0 190 210"');
+    expect(svg).toContain('width="183mm"');
+    expect(svg).toContain('height="183mm"');
+    expect(svg).toContain('viewBox="0 0 183 183"');
     expect(svg.match(/<circle /g)).toHaveLength(10);
     expect(svg).toContain('r="80"');
+  });
+
+  it('fits inside the margins browsers use by default, on Letter and on A4', () => {
+    // Half an inch a side is the widest default among the common browsers.
+    // A sheet that does not fit is shrunk by the browser, and then the square is not 180 mm.
+    const { width, height } = sheetSizeMm(getTarget());
+    const margin = 12.7;
+    for (const paper of [{ w: 215.9, h: 279.4 }, { w: 210, h: 297 }]) {
+      expect(width).toBeLessThan(paper.w - margin * 2);
+      expect(height).toBeLessThan(paper.h - margin * 2);
+    }
+  });
+
+  it('draws a 50 mm check bar inside the square, clear of the rings and the corner marks', () => {
+    const svg = printableTargetSvg(getTarget());
+    const bar = svg.match(/<path d="M([\d.]+) ([\d.]+)h50M/);
+    expect(bar).not.toBeNull();
+    const [x, y] = [Number(bar[1]), Number(bar[2])];
+    // square from 1.5 to 181.5; rings end 80 mm from the centre at 91.5; corner marks are 14 mm long
+    expect(y).toBeGreaterThan(91.5 + 80 + 2);
+    expect(y).toBeLessThan(181.5 - 2);
+    expect(x).toBeGreaterThan(1.5 + 14 + 2);
+    expect(x + 50).toBeLessThan(181.5 - 14);
   });
 });

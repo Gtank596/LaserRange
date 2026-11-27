@@ -1,4 +1,5 @@
 import { summarizeHits } from '../calibration/scoring.js';
+import { safePrintScale } from '../calibration/printScale.js';
 import { getTarget } from '../calibration/targets.js';
 
 // What a saved session looks like, and the numbers worked out from its hits.
@@ -33,6 +34,7 @@ import { getTarget } from '../calibration/targets.js';
  * @property {boolean} simulated  true for the test pattern: not a real camera session
  * @property {boolean} scored     a calibration was in use
  * @property {string | null} targetId
+ * @property {number} [printScale]  how big the sheet printed: 0.95 when its 50 mm bar measured 47.5 mm. Absent means 1
  * @property {{ redDelta: number, dotLimit: string }} settings
  * @property {string} build
  * @property {SessionHit[]} hits
@@ -43,8 +45,9 @@ import { getTarget } from '../calibration/targets.js';
  * ("extreme spread"). Null with fewer than two hits.
  * @param {{ targetX: number, targetY: number }[]} hits
  * @param {{ outerRingRadiusMm: number }} target
+ * @param {number} [printScale] how big the sheet actually printed (1 = full size)
  */
-export function groupSizeMm(hits, target) {
+export function groupSizeMm(hits, target, printScale = 1) {
   if (hits.length < 2) return null;
   let widest = 0;
   for (let i = 0; i < hits.length; i++) {
@@ -53,7 +56,7 @@ export function groupSizeMm(hits, target) {
       if (d > widest) widest = d;
     }
   }
-  return widest * target.outerRingRadiusMm;
+  return widest * target.outerRingRadiusMm * printScale;
 }
 
 /**
@@ -61,9 +64,9 @@ export function groupSizeMm(hits, target) {
  * session was not scored.
  * "Accuracy" is points scored out of points possible for the hits that were
  * detected; it cannot account for anything the camera did not see.
- * @param {Pick<SessionRecord, 'hits' | 'scored' | 'targetId'>} session
+ * @param {Pick<SessionRecord, 'hits' | 'scored' | 'targetId' | 'printScale'>} session
  */
-export function summarizeSession({ hits, scored, targetId }) {
+export function summarizeSession({ hits, scored, targetId, printScale }) {
   if (!scored) {
     return { hits: hits.length, scored: false, score: null, maxScore: null, accuracyPct: null, groupMm: null, onTarget: null };
   }
@@ -76,7 +79,7 @@ export function summarizeSession({ hits, scored, targetId }) {
     score: totals.score,
     maxScore: totals.maxScore,
     accuracyPct: totals.accuracyPct,
-    groupMm: groupSizeMm(hits, target),
+    groupMm: groupSizeMm(hits, target, safePrintScale(printScale)),
     /** Hits that landed inside the rings. */
     onTarget: hits.filter((hit) => hit.score > 0).length,
   };

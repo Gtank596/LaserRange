@@ -680,12 +680,16 @@ h1:focus {
   .sheet {
     padding: 0;
     border-radius: 0;
+    /* One page: the drawing is never split. */
+    break-inside: avoid;
   }
 
-  /* The SVG's own width and height are in millimetres: print it at true size. */
+  /* Print the drawing at its true size (set in millimetres by the print screen),
+     never stretched or squeezed to the page. */
   .sheet svg {
-    width: 190mm;
-    height: 210mm;
+    width: var(--sheet-w);
+    height: var(--sheet-h);
+    max-width: none;
   }
 }
 
@@ -742,7 +746,8 @@ h1:focus {
   font-weight: 600;
 }
 
-.field select {
+.field select,
+.field input {
   width: 100%;
   min-height: var(--tap);
   padding: 0 var(--space-2);

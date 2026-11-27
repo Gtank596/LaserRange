@@ -1,3 +1,4 @@
+import { CHECK_BAR_MM, safePrintScale } from '../calibration/printScale.js';
 import { getTarget } from '../calibration/targets.js';
 import { confidenceWord } from '../detection/params.js';
 import { summarizeSession } from '../sessions/metrics.js';
@@ -66,6 +67,14 @@ export function sessionMapHtml(session, { title = 'Hit map' } = {}) {
     </section>`;
 }
 
+/** What the millimetre figure rests on: an entered bar measurement, or the assumption of a full-size print. */
+function groupBasis(session) {
+  const scale = safePrintScale(session.printScale);
+  return scale === 1
+    ? 'if the target was printed at full size'
+    : `using the sheet’s check bar measured at ${Math.round(scale * CHECK_BAR_MM * 10) / 10} mm`;
+}
+
 function hitRowsHtml(session) {
   return session.hits
     .map((hit, i) => {
@@ -87,7 +96,7 @@ export function sessionSummaryHtml(session) {
   const summary = summarizeSession(session);
   const group =
     summary.scored && summary.groupMm !== null
-      ? `${summary.groupMm.toFixed(0)} mm <small>widest distance between two hits, if the target was printed at full size</small>`
+      ? `${summary.groupMm.toFixed(0)} mm <small>widest distance between two hits, ${groupBasis(session)}</small>`
       : summary.scored
         ? 'needs two hits'
         : 'needs a calibration';

@@ -61,7 +61,7 @@ export function buildTrends(sessions, { limit = TREND_LIMIT } = {}) {
       key: 'group',
       title: 'Group size',
       unit: ' mm',
-      note: 'Widest distance between two hits, if the target was printed at full size. Smaller is tighter.',
+      note: 'Widest distance between two hits on the paper. Right only if the sheet printed at full size, or its check bar was measured and entered on the print screen. Smaller is tighter.',
       fixedMax: null,
       points: recent(scored.filter((row) => row.summary.groupMm !== null).map((row) => point(row, Math.round(row.summary.groupMm)))),
       left: real.length - scored.filter((row) => row.summary.groupMm !== null).length,

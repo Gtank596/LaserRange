@@ -36,16 +36,34 @@ export function ringShare(target) {
   return target.outerRingRadiusMm / (target.squareMm / 2);
 }
 
+/** White space around the square on the printed sheet, mm: just enough for the corner marks. */
+const SHEET_MARGIN_MM = 1.5;
+/** Length of the ruler-check bar on the sheet at 100%, mm. */
+export const SHEET_BAR_MM = 50;
+
+/**
+ * Size of the printed sheet's drawing in millimetres. It is kept barely larger
+ * than the square itself: a drawing that does not fit inside the printer's
+ * margins gets shrunk by the browser or the printer, and then nothing on it
+ * is the size it says.
+ * @param {TargetDefinition} target
+ */
+export function sheetSizeMm(target = getTarget()) {
+  const side = target.squareMm + SHEET_MARGIN_MM * 2;
+  return { width: side, height: side };
+}
+
 /**
  * The target as an SVG sized in real millimetres, for printing at 100%.
  * Light lines on white so a red dot stays visible everywhere on it.
+ * The check bar and its caption sit inside the square, in the strip below the
+ * rings, so the sheet is no taller than it is wide.
  * @param {TargetDefinition} target
  */
 export function printableTargetSvg(target = getTarget()) {
-  const margin = 5;
+  const margin = SHEET_MARGIN_MM;
   const side = target.squareMm;
-  const width = side + margin * 2;
-  const height = side + margin * 2 + 20;
+  const { width, height } = sheetSizeMm(target);
   const c = margin + side / 2;
   const step = target.outerRingRadiusMm / target.ringCount;
 
@@ -74,7 +92,9 @@ export function printableTargetSvg(target = getTarget()) {
     .map((d) => `<path d="${d}" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="square"/>`)
     .join('');
 
-  const footY = b + 9;
+  // The strip between the outer ring and the square's bottom edge.
+  const barX = a + 22;
+  const barY = b - 4.5;
   return `<svg xmlns="http://www.w3.org/2000/svg" class="print-target" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" role="img" aria-label="${target.name} target, ${side} millimetre square">
     <rect width="${width}" height="${height}" fill="#fff"/>
     <rect x="${a}" y="${a}" width="${side}" height="${side}" fill="none" stroke="#000" stroke-width="0.8"/>
@@ -82,10 +102,9 @@ export function printableTargetSvg(target = getTarget()) {
     <path d="M${c - target.outerRingRadiusMm} ${c}H${c + target.outerRingRadiusMm}M${c} ${c - target.outerRingRadiusMm}V${c + target.outerRingRadiusMm}" stroke="#999" stroke-width="0.2"/>
     ${rings.join('')}
     <g font-family="Arial, Helvetica, sans-serif" font-size="3.4" fill="#555">${labels.join('')}</g>
-    <g font-family="Arial, Helvetica, sans-serif" font-size="3.6" fill="#000">
-      <text x="${a}" y="${footY}">${target.name} · square ${side} mm · print at 100% (actual size)</text>
-      <path d="M${a} ${footY + 6}h50M${a} ${footY + 4}v4M${a + 50} ${footY + 4}v4" stroke="#000" stroke-width="0.4" fill="none"/>
-      <text x="${a + 53}" y="${footY + 7.2}">this bar should measure 50 mm</text>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="3.2" fill="#000">
+      <path d="M${barX} ${barY}h${SHEET_BAR_MM}M${barX} ${barY - 2}v4M${barX + SHEET_BAR_MM} ${barY - 2}v4" stroke="#000" stroke-width="0.4" fill="none"/>
+      <text x="${barX + SHEET_BAR_MM + 3}" y="${barY + 1.1}">this bar: ${SHEET_BAR_MM} mm at 100% · square ${side} mm</text>
     </g>
   </svg>`;
 }
