@@ -190,6 +190,44 @@ describe('flash pipeline on synthetic frames', () => {
       const moving = (i) => (i >= 20 && i < 60 ? [{ x: 90 + (i - 20), y: 20, w: 30, h: 60, color: [230, 140, 120] }] : []);
       expect(run((i) => (i === 30 ? [dot({ x: 0.25 })] : []), moving)).toHaveLength(1);
     });
+
+    describe('when the watched target is a small part of the picture', () => {
+      // A 40 x 40 pixel target: about 8% of the 160 x 120 picture.
+      const smallTarget = new Uint8Array(WIDTH * HEIGHT);
+      for (let y = 40; y < 80; y++) for (let x = 60; x < 100; x++) smallTarget[y * WIDTH + x] = 1;
+
+      const runSmall = (flashesFor) => {
+        const render = createSceneRenderer({ width: WIDTH, height: HEIGHT, seed: 3 });
+        const pipeline = createFlashPipeline(WIDTH, HEIGHT, { warmupMs: 0 }, { mask: smallTarget });
+        const hits = [];
+        const statuses = new Set();
+        for (let i = 0; i < 80; i++) {
+          const result = pipeline.process(render({ flashes: flashesFor(i) }), i * FRAME_MS);
+          statuses.add(result.status);
+          if (result.event?.accepted) hits.push(result.event);
+        }
+        return { hits, statuses };
+      };
+
+      it('counts a flash that is small in the picture even though it fills a good share of the target', () => {
+        // Seen on the phone, 2026-11-28: with a target found, every flash of the
+        // LED was reported as "the picture changed" and none was counted. The
+        // limits were being measured against the target's area, not the picture's.
+        // Radius 6 is about 0.6% of the picture (inside the 1% dot limit) but 7% of this target.
+        const { hits, statuses } = runSmall((i) => (i === 30 || i === 31 ? [dot({ x: 0.5, y: 0.5, radius: 6 })] : []));
+        expect(statuses.has('unstable')).toBe(false);
+        expect(statuses.has('large')).toBe(false);
+        expect(hits).toHaveLength(1);
+        expect(hits[0].x).toBeCloseTo(0.5, 1);
+      });
+
+      it('still refuses a lit area too big for the picture-wide dot limit', () => {
+        // Radius 10 is about 1.6% of the picture: over the 1% limit, with or without a target.
+        const { hits, statuses } = runSmall((i) => (i === 30 || i === 31 ? [dot({ x: 0.5, y: 0.5, radius: 10 })] : []));
+        expect(hits).toHaveLength(0);
+        expect(statuses.has('large')).toBe(true);
+      });
+    });
   });
 
   it('rejects a red region far larger than a laser dot, and says it was too large rather than movement', () => {

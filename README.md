@@ -25,7 +25,7 @@ browser only. A scored session on the printed target has not been run.
 | Dashboard (stats, target overlay, navigation) | Built. Shows the most recent saved session; until one exists, sample data that is labeled as such |
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
-| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
+| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 35 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
 | Printable target: 180 mm square with a 5 mm black border (added Nov 28 so the app can find it; earlier prints have only a thin line and must be reprinted), 10 rings, an unlabelled 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
@@ -362,6 +362,23 @@ calibration, `hardware/FlashSweep`. The session was paused once, part of the way
 - This matters for the laser: if the cartridge's pulse is only a few milliseconds, an occasional miss of this
   kind should be expected at 60 frames a second. The pulse length is still not known.
 
+### A found target and the LED
+
+Nov 28, 2026, build `92b5317`, the first session on the phone with a target found. Reported: every time the LED
+flashed, the session showed "The picture changed: settling". The hit count was not reported.
+
+- Cause: with a target in use, the limits on how much of the picture may change at once (3%, or 10% on Large)
+  and on how big a lit spot may be (1%, or 5%) were being measured against the target's area, not the whole
+  picture. A target is a small part of the picture, so a flash that was well inside the limits in every earlier
+  run went far over them, and the detector took each flash for a change of lighting.
+- This was a mistake in the design, flagged as an untried guess when it was written, not something the tests
+  could have caught: the only masked tests watched half the picture.
+- Fix: the limits are a share of the whole picture, with or without a target, so a flash is judged the same way
+  in both cases. Two tests now cover a target that is 8% of the picture: a flash that is 0.6% of the picture and
+  7% of the target is counted; one that is 1.6% of the picture is still refused as too large.
+- **Not yet re-run on the phone.** The fix makes a found-target session behave like the earlier no-target runs,
+  where the bare LED needed Dot size limit: Large.
+
 Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
 limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
 
@@ -425,7 +442,8 @@ score, and distances can later be given in millimetres.
   the target" message. Corners saved there are used by the next session, and only with the source and picture
   size they were made with.
 - Under Detection settings a session can also be told to use no target at all, for tests with a bare LED.
-- With a calibration in use, detection watches only the target area, so movement elsewhere is ignored.
+- With a target in use, detection watches only the target area, so movement elsewhere is ignored. The limits on
+  how big a spot may be stay shares of the whole picture.
 
 ## Unverified assumptions
 
@@ -446,8 +464,8 @@ score, and distances can later be given in millimetres.
   but not shown to be exactly 100%. Measuring a side of the square (7 3/32 in at full size) would be about three
   and a half times finer. Even at 98.4% a 40 mm group would be off by well under a millimetre.
 - **Detection settings.** Chosen against synthetic frames, plus one recording of an LED. The true size and
-  brightness of a laser dot on paper are unmeasured, so the 1% dot size limit is a guess. With a calibration the
-  limit is 1% of the target area, which is smaller still and has never been tried on a real light.
+  brightness of a laser dot on paper are unmeasured, so the 1% dot size limit is a guess. The limit is 1% of the whole picture
+  whether or not a target is in use (see "A found target and the LED").
 - **The LED is not the laser.** It is far longer (100 ms so far), a different brightness, and lights up its
   surroundings. It can show whether the camera and detector catch a red flash of a given length; it cannot show
   that the cartridge will be detected.

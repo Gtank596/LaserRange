@@ -36,13 +36,19 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]
  * @param {{ mask?: Uint8Array | null }} [options] mask: 1 for pixels to watch (the calibrated
  *   target area), 0 to ignore. Everything outside is invisible to detection, including movement.
+ *   The size limits stay shares of the whole picture.
  */
 export function createFrameDetector(width, height, overrides = {}, { mask = null } = {}) {
   const p = { ...DEFAULT_DETECTION_PARAMS, ...overrides };
   const pixels = width * height;
   if (mask && mask.length !== pixels) throw new Error(`Mask must have ${pixels} entries, got ${mask.length}`);
-  // Shares of "the frame" are measured against the watched area.
-  const count = mask ? Math.max(1, mask.reduce((sum, value) => sum + value, 0)) : pixels;
+  // Every "share of the frame" limit is measured against the whole picture,
+  // with or without a mask, so a flash is judged the same way in both cases.
+  // (Until 2026-11-28 a mask made the limits a share of the watched area. A
+  // target is a small part of the picture, so a flash that was well inside
+  // the limits without a target went far over them with one: on the phone
+  // every LED flash on a found target was reported as a scene change.)
+  const count = pixels;
   const bgRed = new Float32Array(pixels);
   const bgLuma = new Float32Array(pixels);
   const prevLuma = new Float32Array(pixels);
@@ -63,7 +69,7 @@ export function createFrameDetector(width, height, overrides = {}, { mask = null
     best: null,
   });
 
-  /** The biggest lit region of a frame, with its size as a share of the watched area. */
+  /** The biggest lit region of a frame, with its size as a share of the picture. */
   const describeLargest = (regions) => {
     let big = null;
     for (const blob of regions) if (!big || blob.area > big.area) big = blob;
