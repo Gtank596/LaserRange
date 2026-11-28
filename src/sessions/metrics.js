@@ -13,13 +13,15 @@ import { getTarget } from '../calibration/targets.js';
 /**
  * @typedef {object} SessionHit
  * @property {number} tMs        watching time since the session started (pauses left out)
- * @property {number} x          position in the picture, 0-1 across
+ * @property {number} x          position in the picture, 0-1 across: where the spot first appeared
  * @property {number} y          position in the picture, 0-1 down
  * @property {number} [targetX]  position on the target (scored sessions only)
  * @property {number} [targetY]
  * @property {number} [score]    ring score, 0 when outside the rings (scored sessions only)
  * @property {number} confidence 0-1 signal strength (a rough level, not a probability)
  * @property {number} frames     video frames the flash was seen in
+ * @property {number} [durationMs]  from the first frame the flash was seen in to the last (absent before 2026-11-28)
+ * @property {number} [travel]   how far the spot moved while lit, as a share of the picture (absent before 2026-11-28)
  */
 
 /**
@@ -85,6 +87,35 @@ export function summarizeSession({ hits, scored, targetId, printScale }) {
     /** Hits that landed inside the rings. */
     onTarget: hits.filter((hit) => hit.score > 0).length,
   };
+}
+
+/**
+ * How long the flashes of a session stayed lit, from the hits that recorded
+ * it: shortest, middle and longest, in ms. Null when no hit recorded a length
+ * (sessions saved before lengths were kept).
+ * A length runs from the first video frame a flash was seen in to the last, so
+ * the light was on for about one frame longer; a flash seen in one frame is 0.
+ * @param {{ durationMs?: number }[]} hits
+ */
+export function flashLengths(hits) {
+  const lengths = hits
+    .map((hit) => hit.durationMs)
+    .filter((ms) => Number.isFinite(ms) && ms >= 0)
+    .sort((a, b) => a - b);
+  if (!lengths.length) return null;
+  const mid = lengths.length >> 1;
+  const medianMs = lengths.length % 2 ? lengths[mid] : (lengths[mid - 1] + lengths[mid]) / 2;
+  return { count: lengths.length, minMs: lengths[0], medianMs, maxMs: lengths[lengths.length - 1] };
+}
+
+/** "50 to 385 ms, typically 185 ms"; "about 20 ms" when they are all alike. */
+export function describeFlashLengths(lengths) {
+  if (!lengths) return '';
+  const ms = (value) => Math.round(value / 5) * 5;
+  const [low, mid, high] = [ms(lengths.minMs), ms(lengths.medianMs), ms(lengths.maxMs)];
+  if (high === 0) return 'one video frame each';
+  if (low === high) return `about ${high} ms`;
+  return `${low === 0 ? 'one frame' : low} to ${high} ms, typically ${mid} ms`;
 }
 
 /** A new id for a session: unique on this device, and sorts roughly by time. */

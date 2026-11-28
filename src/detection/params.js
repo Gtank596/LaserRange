@@ -1,7 +1,9 @@
 // Tunable detection settings. Every value is a starting guess chosen against
 // synthetic frames. The first runs against a real LED (2026-11-25) changed how
-// movement is told from a flash's own glow; no value has been validated against
-// a laser cartridge.
+// movement is told from a flash's own glow. One run with a laser cartridge
+// (2026-11-28) showed flashes lit for far longer than the LED's, which changed
+// maxEventMs and where a hit is placed. No value has been validated against a
+// known number of cartridge flashes.
 
 export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   // --- per-pixel test ---
@@ -51,8 +53,22 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
   maxGapMs: 40,
   /** Spots farther apart than this (share of frame size) belong to different hits. */
   mergeDistance: 0.06,
-  /** Something lit for longer than this is an object in view, not a flash. */
-  maxEventMs: 400,
+  /**
+   * Something lit for longer than this is an object in view, not a flash.
+   * Was 400 until the first cartridge run: the hits that run counted were lit
+   * for 50 to 385 ms, four of them within a frame or two of 400, so longer
+   * flashes may have been refused unseen. 1000 is a guess with room to spare,
+   * not a measured upper limit.
+   */
+  maxEventMs: 1000,
+  /** A lit area too big to be a dot is taken into the background after this long. */
+  absorbLargeMs: 400,
+  /**
+   * A hit is placed where the spot was during this long after it first
+   * appeared, not averaged over the whole time it was lit: a dot that is lit
+   * for a fifth of a second can move while it is on, and the start is the shot.
+   */
+  aimWindowMs: 50,
   /** Minimum quiet time between two accepted hits. */
   cooldownMs: 120,
   /** After movement or a lighting change, ignore spots for this long. */

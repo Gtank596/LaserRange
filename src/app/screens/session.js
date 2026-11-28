@@ -489,6 +489,8 @@ export function sessionScreen(root) {
       y: round(event.y),
       confidence: round(event.confidence, 2),
       frames: event.frames,
+      durationMs: Math.round(event.durationMs),
+      travel: round(event.travel),
     };
     if (live.mapper) {
       const place = live.mapper.imageToTarget(event.x, event.y);

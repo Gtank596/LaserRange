@@ -1,7 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 import { getTarget } from '../calibration/targets.js';
-import { groupSizeMm, isSessionRecord, newSessionId, summarizeSession } from './metrics.js';
+import { describeFlashLengths, flashLengths, groupSizeMm, isSessionRecord, newSessionId, summarizeSession } from './metrics.js';
 import { openSessionStore, SCHEMA_VERSION, upgradeSchema } from './store.js';
 
 const target = getTarget('lr-10'); // outer ring radius 80 mm, 10 rings
@@ -156,5 +156,30 @@ describe('session store (IndexedDB)', () => {
 describe('throws a clear error without a database', () => {
   it('when the browser has none', async () => {
     await expect(openSessionStore(null)).rejects.toThrow('no on-device database');
+  });
+});
+
+describe('flashLengths', () => {
+  it('gives the shortest, middle and longest lit time', () => {
+    const lengths = flashLengths([{ durationMs: 385 }, { durationMs: 50 }, { durationMs: 185 }]);
+    expect(lengths).toEqual({ count: 3, minMs: 50, medianMs: 185, maxMs: 385 });
+    expect(describeFlashLengths(lengths)).toBe('50 to 385 ms, typically 185 ms');
+  });
+
+  it('takes the middle of an even number as halfway between the two middle ones', () => {
+    expect(flashLengths([{ durationMs: 100 }, { durationMs: 200 }]).medianMs).toBe(150);
+  });
+
+  it('leaves out hits saved before lengths were kept, and is null when none has one', () => {
+    expect(flashLengths([{ frames: 3 }, { durationMs: 33 }])).toMatchObject({ count: 1, minMs: 33 });
+    expect(flashLengths([{ frames: 3 }])).toBeNull();
+    expect(flashLengths([])).toBeNull();
+    expect(describeFlashLengths(null)).toBe('');
+  });
+
+  it('describes flashes seen in a single frame without calling them 0 ms long', () => {
+    expect(describeFlashLengths(flashLengths([{ durationMs: 0 }, { durationMs: 0 }]))).toBe('one video frame each');
+    expect(describeFlashLengths(flashLengths([{ durationMs: 0 }, { durationMs: 17 }, { durationMs: 33 }]))).toBe('one frame to 35 ms, typically 15 ms');
+    expect(describeFlashLengths(flashLengths([{ durationMs: 17 }, { durationMs: 17 }]))).toBe('about 15 ms');
   });
 });

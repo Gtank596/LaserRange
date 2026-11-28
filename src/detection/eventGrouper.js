@@ -5,10 +5,15 @@ import { DEFAULT_DETECTION_PARAMS } from './params.js';
 //
 // push(t, blob) is called for every frame, with the frame's best spot or null.
 // It returns null, or one event:
-//   { accepted: true,  index, t, endT, durationMs, frames, x, y, peak, area, stray }
+//   { accepted: true,  index, t, endT, durationMs, frames, x, y, travel, peak, area, stray }
 //   { accepted: false, reason: 'cooldown' | 'persistent', ...same fields }
 // cancel(reason) discards the hit in progress (used when the scene is disturbed;
 // the pipeline passes 'motion' or 'large').
+//
+// x, y is where the spot was when it first appeared (its first aimWindowMs),
+// and travel is how far it had moved from there by its last frame, as a share
+// of the picture. durationMs runs from the first frame it was seen in to the
+// last, so the light was on for about one frame longer than that.
 
 /**
  * @param {Partial<typeof DEFAULT_DETECTION_PARAMS>} [overrides]
@@ -24,8 +29,9 @@ export function createEventGrouper(overrides = {}) {
     endT: ev.lastT,
     durationMs: ev.lastT - ev.startT,
     frames: ev.frames,
-    x: ev.wx / ev.w,
-    y: ev.wy / ev.w,
+    x: ev.ax / ev.aw,
+    y: ev.ay / ev.aw,
+    travel: Math.hypot(ev.lastX - ev.ax / ev.aw, ev.lastY - ev.ay / ev.aw),
     peak: ev.peak,
     area: ev.area,
     stray: ev.stray,
@@ -50,20 +56,26 @@ export function createEventGrouper(overrides = {}) {
     push(t, blob) {
       let out = null;
 
-      // A spot somewhere else closes the current hit and starts a new one.
+      // A spot that has jumped somewhere else closes the current hit and
+      // starts a new one. The jump is measured from the previous frame, so a
+      // dot that drifts while it is lit stays one hit however far it goes.
       if (active && blob && !active.persistent) {
-        const far = Math.hypot(blob.x - active.wx / active.w, blob.y - active.wy / active.w) > p.mergeDistance;
+        const far = Math.hypot(blob.x - active.lastX, blob.y - active.lastY) > p.mergeDistance;
         if (far) out = finish();
       }
 
       if (blob) {
-        if (!active) active = { startT: t, lastT: t, frames: 0, w: 0, wx: 0, wy: 0, peak: 0, area: 0, stray: 0, persistent: false };
+        if (!active) active = { startT: t, lastT: t, frames: 0, aw: 0, ax: 0, ay: 0, lastX: blob.x, lastY: blob.y, peak: 0, area: 0, stray: 0, persistent: false };
         if ((blob.stray ?? 0) > active.stray) active.stray = blob.stray;
         active.lastT = t;
         active.frames += 1;
-        active.w += blob.strength;
-        active.wx += blob.x * blob.strength;
-        active.wy += blob.y * blob.strength;
+        active.lastX = blob.x;
+        active.lastY = blob.y;
+        if (t - active.startT < p.aimWindowMs) {
+          active.aw += blob.strength;
+          active.ax += blob.x * blob.strength;
+          active.ay += blob.y * blob.strength;
+        }
         if (blob.peak > active.peak) active.peak = blob.peak;
         if (blob.area > active.area) active.area = blob.area;
 

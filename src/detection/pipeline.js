@@ -67,7 +67,7 @@ export function createFlashPipeline(width, height, overrides = {}, options = {})
         // nothing would be detected for as long as it stays.
         if (frame.status === 'large') {
           if (largeSince === null) largeSince = t;
-          else if (t - largeSince > params.maxEventMs) {
+          else if (t - largeSince > params.absorbLargeMs) {
             detector.absorb();
             largeSince = null;
           }

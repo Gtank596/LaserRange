@@ -346,6 +346,53 @@ describe('createEventGrouper', () => {
     expect(grouper.flush().x).toBeCloseTo(0.8, 6);
   });
 
+  it('places a hit where the spot first appeared, not where it drifted to', () => {
+    // Twelve frames, the spot moving 0.004 of the picture each frame.
+    const grouper = createEventGrouper();
+    for (let i = 0; i < 12; i++) grouper.push(i * FRAME_MS, blob(0.5 + i * 0.004, 0.5));
+    const hit = grouper.flush();
+    expect(hit.accepted).toBe(true);
+    expect(hit.frames).toBe(12);
+    // The first three frames (50 ms at 60 fps): 0.500, 0.504, 0.508.
+    expect(hit.x).toBeCloseTo(0.504, 6);
+    expect(hit.travel).toBeCloseTo(0.544 - 0.504, 6);
+  });
+
+  it('counts a spot that drifts a long way while lit as one hit', () => {
+    // 0.01 of the picture per frame for 20 frames: three times the merge distance in all.
+    const grouper = createEventGrouper();
+    const events = [];
+    for (let i = 0; i < 20; i++) {
+      const event = grouper.push(i * FRAME_MS, blob(0.3 + i * 0.01, 0.4));
+      if (event) events.push(event);
+    }
+    events.push(grouper.flush());
+    expect(events).toHaveLength(1);
+    expect(events[0].accepted).toBe(true);
+    expect(events[0].x).toBeCloseTo(0.31, 6);
+  });
+
+  it('counts a flash lit for 0.6 s, and refuses one still lit after a second', () => {
+    const lit = (frames) => {
+      const grouper = createEventGrouper();
+      const events = [];
+      for (let i = 0; i < frames; i++) {
+        const event = grouper.push(i * FRAME_MS, blob(0.5, 0.5));
+        if (event) events.push(event);
+      }
+      for (let i = frames; i < frames + 6; i++) {
+        const event = grouper.push(i * FRAME_MS, null);
+        if (event) events.push(event);
+      }
+      return events;
+    };
+    const longFlash = lit(36);
+    expect(longFlash).toHaveLength(1);
+    expect(longFlash[0].accepted).toBe(true);
+    expect(longFlash[0].durationMs).toBeCloseTo(35 * FRAME_MS, 6);
+    expect(lit(70).map((event) => event.reason)).toEqual(['persistent']);
+  });
+
   it('bridges a one-frame dropout inside the gap allowance', () => {
     const grouper = createEventGrouper();
     grouper.push(0, blob(0.5, 0.5));

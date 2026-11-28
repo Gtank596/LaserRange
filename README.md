@@ -8,8 +8,10 @@ accounts, no uploads.
 sample data. The camera check is real and measures frame timing. Flash detection works on simulated flashes and
 stays quiet on a still real camera. With an LED test light, the app on the phone counted 30 of 30 flashes of
 100 ms, and in a sweep of shorter ones every flash from 50 ms down to 5 ms and 19 of 20 at 2 ms, with no false
-hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser: a real cartridge is
-untested. Target calibration and ring scoring
+hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser. The laser cartridge
+has now been tried once (Nov 28): the app counted 52 flashes and placed them on the target, but how many
+flashes were fired was not recorded, so nothing is known yet about misses (see "The first run with the laser
+cartridge"). Target calibration and ring scoring
 work on the test pattern. On the printed sheet, the app found the square and lined itself up at the first try
 (one sheet, one setup, Nov 28); a session now does this by itself every time it starts. Live sessions, on-device saving and
 History are built. Two sessions have been run on the phone against the LED sweep, the second one with no
@@ -27,7 +29,7 @@ found, 19 flashes were counted and placed on the rings, and two flashes in the m
 | Dashboard (stats, target overlay, navigation) | Built. Shows the most recent saved session; until one exists, sample data that is labeled as such |
 | Camera check: start/stop, permission and HTTPS errors, frame timing, processing cost, brightness, report export | Built; run on an iPhone (see "Measured so far") |
 | Test pattern source (no camera needed) | Built; software-only |
-| Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 35 deterministic unit tests on synthetic frames |
+| Flash detection: red-spot finder, one hit per flash placed where the dot first appeared, rejection of lighting changes, movement and lingering red objects | Built; 38 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
 | Printable target: 180 mm square with a 5 mm black border (added Nov 28 so the app can find it; earlier prints have only a thin line and must be reprinted), 10 rings, an unlabelled 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
@@ -409,8 +411,49 @@ started, and the session lasted 30 seconds. Exported from History.
 - A laser dot is small and has no glow of this kind, so it may not have this trouble. That is a hope, not a
   measurement: nothing has been tried with the cartridge.
 
-Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
-limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
+### The first run with the laser cartridge
+
+Nov 28, 2026, build `7fd819c` (the build before the "seen but not counted" tally), iPhone, the printed sheet.
+Source Rear camera, Sensitivity Normal, Dot size limit Normal, Target found automatically. A Mantis Pink Rhino
+9mm cartridge, tried by Gabriel. 49 seconds. Exported from History. How the cartridge was set off, how far away
+it was, and **how many times it flashed were not recorded**, so this run says what was counted and nothing
+about what was missed.
+
+- **52 flashes were counted and placed on the target.** 49 landed on the rings, from the 10 out to ring 1, and
+  3 outside. The positions wander all over the target, as they would if the dot was being moved about rather
+  than aimed. Signal was "strong" for 50 of the 52 and "fair" for two.
+- **The laser dot fits the Normal dot size limit** (1% of the picture), which the bare LED never did. Whether
+  any frame was refused as too big in between is not known: this build kept no tally.
+- **The flashes are long.** Each hit records the number of video frames the light was seen in: 4 to 24, half
+  of them 12 or more, 43 of the 52 between 9 and 16. At 60 frames a second that is roughly 70 to 400 ms lit,
+  typically about 200 ms. This is what the camera saw in one run, not the cartridge's specification. The first
+  four flashes, about 1.1 s apart, were lit for 22 to 24 frames; the later ones, as little as 0.27 s apart,
+  mostly 9 to 15. Why the length varies is not known.
+- So for this cartridge, catching a flash that falls between frames, the worry behind the LED sweep, does not
+  look like the risk. The app's own limits do:
+  - **"Stayed lit too long" was set at 400 ms**, and four of the counted flashes were within a frame or two of
+    it. Any flash a little longer would have been refused, and this run cannot say whether that happened. The
+    limit is now 1000 ms. That is a guess with room to spare, not a measured upper limit.
+  - **A hit within 120 ms of the end of the last one is refused.** Six of the counted flashes began 130 to
+    150 ms after the one before ended, right at that edge. Whether any closer ones were refused is not known.
+    The limit has not been changed.
+- Changes made because of this run:
+  - A hit is now placed where the dot was in the first 50 ms it was seen (three frames), not at the average
+    over the whole time it was lit. A dot that is lit for a fifth of a second can move while it is on. For a
+    dot that stays still the two are the same.
+  - A dot that drifts while lit is one hit however far it goes: a jump is now measured from the previous frame,
+    not from the hit's average position.
+  - Each hit records how long it was lit (first frame seen to last) and how far the dot moved in that time, and
+    Details shows the range of lit times for the session.
+  - None of this has run on the phone.
+- The steps between one hit and the next are small (mostly 2% to 6% of the picture), too small for these to be
+  pieces of one long-lit moving dot cut up by the app: under the old rule such pieces would have been several
+  times further apart. They are separate flashes.
+- Not known from this run: how many flashes were missed or refused; whether positions are right (there was no
+  known aim point); the dot's size in the picture; behaviour at another distance or in other light.
+
+Still unknown: how many cartridge flashes go uncounted, and why; whether the lit time seen here holds for other
+ways of using the cartridge; flashes under 2 ms (which this cartridge does not seem to produce).
 
 ## How detection works
 
@@ -427,8 +470,10 @@ counted in the first 2 seconds after starting, while the camera settles.
    comes on, darker when it goes off. If other parts of the frame changed since the previous frame, or the area
    around the spot got both brighter and darker (an object arriving in one place and leaving another), something
    is moving in view; the frame is skipped and any hit that was forming is discarded.
-5. **Across frames:** spots in consecutive frames at the same place become one hit. Something that stays lit
-   longer than 400 ms is rejected as an object, and a second hit within 120 ms of the last is suppressed.
+5. **Across frames:** spots in consecutive frames become one hit unless the spot jumps from one frame to the
+   next. The hit is placed where the spot was in its first 50 ms. Something that stays lit longer than 1000 ms
+   is rejected as an object (400 ms until the first cartridge run), and a second hit within 120 ms of the last
+   is suppressed.
 
 Known gap: a small reddish object entering the view slowly, with no trailing edge yet in frame, can still look
 like a flash for a frame or two. Limiting detection to the calibrated target area (milestone 4) should reduce
@@ -515,12 +560,15 @@ score, and distances can later be given in millimetres.
 - **Flash capture.** Frame timing says when frames reach the page, not how long the sensor exposed each frame.
   Whether a short flash is caught depends on exposure and rolling-shutter timing, which the page may not be able
   to read or control. This has to be measured with the LED fixture, not inferred from frame rate.
-- **Pulse duration.** The Pink Rhino's pulse length is unknown. Nothing in the code assumes one.
+- **Pulse duration.** The Pink Rhino's pulse length is not known from its maker. In one run the camera saw
+  flashes lit for roughly 70 to 400 ms (see "The first run with the laser cartridge"). The code assumes only
+  that a flash is over within 1000 ms, which is a guess.
 - **Frame metadata.** `requestVideoFrameCallback` fields for camera streams differ between browsers; "frames
   missed" shows "not reported" when the browser does not supply the count.
 - **Installed mode.** Camera behaviour in the home-screen app can differ from a Safari tab.
-- **Hardware.** Compatibility with the cartridge and the firearm is unverified until tested safely after the
-  gift exchange. The app never claims a firearm is safe or unloaded.
+- **Hardware.** The camera sees the cartridge's flash (one run). How many flashes it misses, and how the app
+  behaves in the setup it will really be used in, are unverified. The app never claims a firearm is safe or
+  unloaded.
 
 ## Project layout
 

@@ -1,7 +1,7 @@
 import { CHECK_BAR_MM, safePrintScale } from '../calibration/printScale.js';
 import { getTarget } from '../calibration/targets.js';
 import { confidenceWord } from '../detection/params.js';
-import { summarizeSession } from '../sessions/metrics.js';
+import { describeFlashLengths, flashLengths, summarizeSession } from '../sessions/metrics.js';
 import { describeSkips } from '../sessions/skips.js';
 import { targetLegendHtml, targetOverlaySvg } from './targetOverlay.js';
 
@@ -95,6 +95,7 @@ function hitRowsHtml(session) {
  */
 export function sessionSummaryHtml(session) {
   const summary = summarizeSession(session);
+  const lengths = flashLengths(session.hits);
   const group =
     summary.scored && summary.groupMm !== null
       ? `${summary.groupMm.toFixed(0)} mm <small>widest distance between two hits, ${groupBasis(session)}</small>`
@@ -121,6 +122,11 @@ export function sessionSummaryHtml(session) {
             ? `<div class="metric metric--wide"><dt>Seen but not counted</dt><dd>${describeSkips(session.notCounted)} <small>(times the app saw something and chose not to count it; a flash the camera never caught is not here)</small></dd></div>`
             : ''
         }
+        ${
+          lengths
+            ? `<div class="metric metric--wide"><dt>Each flash stayed lit</dt><dd>${describeFlashLengths(lengths)} <small>(as the camera saw it, to the nearest video frame)</small></dd></div>`
+            : ''
+        }
         <div class="metric"><dt>Source</dt><dd>${session.simulated ? 'Test pattern' : 'Rear camera'}</dd></div>
         <div class="metric"><dt>Detection</dt><dd>${SENSITIVITY_NAMES[session.settings?.redDelta] ?? session.settings?.redDelta} · dot ${DOT_NAMES[session.settings?.dotLimit] ?? session.settings?.dotLimit}</dd></div>
       </dl>
@@ -136,5 +142,5 @@ export function sessionSummaryHtml(session) {
           </section>`
         : ''
     }
-    <p class="fine-print">A session records what the camera detected. Detection has been measured with an LED test light, not yet with a laser cartridge, so a hit that was not seen cannot be counted and is not shown as a miss.</p>`;
+    <p class="fine-print">A session records what the camera detected. A flash it did not see cannot be counted and is not shown as a miss. Detection has been measured with an LED test light and tried with a laser cartridge; how many cartridge flashes it misses has not been measured.</p>`;
 }
