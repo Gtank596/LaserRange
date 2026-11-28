@@ -16,7 +16,9 @@ History are built. Two sessions have been run on the phone against the LED sweep
 connection: 123 of 123 flashes counted each time, saved, and read back from History. A third session tried
 pause on the phone: the nine flashes sent during the pause and the warm-up after it were left out, as intended.
 History's trend charts and the first-run welcome with its safety reminder are built and checked in a desktop
-browser only. A scored session on the printed target has not been run.
+browser only. The first scored session on the printed target was run on Nov 28 with the LED: the target was
+found, 19 flashes were counted and placed on the rings, and two flashes in the middle of a set were not counted
+(see "The first scored session on paper").
 
 ## What works today
 
@@ -34,7 +36,7 @@ browser only. A scored session on the printed target has not been run.
 | Detection limited to the calibrated target area | Built and unit tested |
 | Live session: finds the printed target when it starts and lines itself up (no separate calibration step), counts each flash once, places it on the target and scores it, asks the phone to keep its screen awake. If the target is not found within 5 seconds: try again, count without scores, or use corners placed by hand | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
 | Pause and resume: counting and the session clock stop, the camera stays open, and resuming starts with the 2-second warm-up again | Built; 6 unit tests on the clock. In a desktop browser on the test pattern the clock stood still while paused, nothing was counted, and hits were counted again after resuming. Run once on the iPhone (see "A paused session on the phone") |
-| Saved sessions (IndexedDB on the device) and History: list, one session in full, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone two sessions were saved and exported from History. **Whether they survive closing the app or restarting the phone is not recorded** |
+| Saved sessions (IndexedDB on the device) and History: list, one session in full, a tally of what was seen but not counted and why, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone two sessions were saved and exported from History. **Whether they survive closing the app or restarting the phone is not recorded** |
 | Trend charts in History: accuracy, group size and hits per session, oldest to newest, simulated sessions left out | Built; 13 unit tests on which sessions go into which chart and where the points are drawn. Checked in a desktop browser with made-up records, since removed. **Not seen on the iPhone, and never with real scored sessions** |
 | Offline use: a service worker keeps a copy of each build on the device; opening the app asks the network first and falls back to the saved copy; the home screen shows whether a copy is saved | Built; 5 unit tests on how the file list is made. In a desktop browser with the server switched off, the built app reloaded, ran and saved a test-pattern session, and showed History. On the iPhone it was reported working, and a camera session was run and saved with no connection (see "A session with no connection") |
 | First-run welcome: what the app does, the safety reminder, what to expect from the camera prompt. Shown in place of every screen until acknowledged on the device, and readable again from the dashboard | Built; 6 unit tests on remembering the acknowledgement. Checked in a desktop browser. **Not seen on the iPhone** |
@@ -376,8 +378,36 @@ flashed, the session showed "The picture changed: settling". The hit count was n
 - Fix: the limits are a share of the whole picture, with or without a target, so a flash is judged the same way
   in both cases. Two tests now cover a target that is 8% of the picture: a flash that is 0.6% of the picture and
   7% of the target is counted; one that is 1.6% of the picture is still refused as too large.
-- **Not yet re-run on the phone.** The fix makes a found-target session behave like the earlier no-target runs,
-  where the bare LED needed Dot size limit: Large.
+- Re-run on the phone the same day: fixed (next section).
+
+### The first scored session on paper
+
+Nov 28, 2026, build `7fd819c`, iPhone, the printed sheet with the black border. Source Rear camera, Sensitivity
+Normal, Dot size limit Large, Target found automatically. The LED sweep was already running when the session
+started, and the session lasted 30 seconds. Exported from History.
+
+- **It works end to end.** The target was found, 19 flashes were counted, each was placed on the target and
+  given a ring score, and the session was saved with its hit map. Gabriel reported the shown position as "almost
+  right" for where the LED was.
+- 18 of the 19 hits are on ring 9, within about 15 mm of each other on the paper. Over the session they drift
+  about 15 mm in one direction, and the last hit is far away, outside the rings: the LED was probably being
+  moved by hand at the end. With a bare LED the reported position is the middle of its glow on the paper, not
+  the LED itself.
+- **Two flashes inside a set were not counted**, the 5th and the 14th of what looks like the 20 ms set (hits
+  seen in 2 to 3 frames, 1.03 s apart). They are nine flashes apart, the same spacing as the misses in the 2 ms
+  sets, so they fall at the same point in the camera's frame cycle. The 20 ms set was 80 of 80 in the four
+  earlier runs, with no target and the phone further from the LED. Why these two were refused is not known: a
+  session export lists hits only. The likeliest reason is that at that point in the cycle the whole flash lands
+  in one frame, the glow on the white paper is at its biggest, and it goes over the "too big" limit; this is a
+  guess. Two more flashes after the last hit were also not counted, while the LED was apparently being moved.
+- To stop guessing, a session now keeps a tally of the times it saw something and did not count it, by reason
+  (too big, movement, the picture changed, stayed lit too long, too soon after a hit). It is shown under Details
+  and saved with the session. Built after this run, so this run has no tally.
+- The session was saved with a print scale of 95.2%, which means a bar measurement of 47.6 mm (or a square side
+  of 171.4 mm) is stored on the phone. Whether that was measured on the sheet in use was not recorded.
+- Group size came out as 87 mm because of the one far hit. Accuracy 85% (162 of 190).
+- A laser dot is small and has no glow of this kind, so it may not have this trouble. That is a hope, not a
+  measurement: nothing has been tried with the cartridge.
 
 Still unknown: how big and bright a laser dot on paper looks to this camera, which decides whether 1% is the right
 limit and whether a short pulse is caught; the cartridge's actual pulse length; flashes under 2 ms.
@@ -539,7 +569,7 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 1. ~~Scaffold, theme, dashboard~~
 2. ~~Camera permission flow, preview, frame telemetry~~ (iPhone run pending)
 3. ~~Simulation: controllable synthetic flashes and deterministic detection fixtures~~ (full-frame-rate run pending)
-4. ~~Calibration: four-corner overlay, homography, known-point tests, finding the printed square automatically~~ (found on the printed sheet once; a scored session on it still to run)
+4. ~~Calibration: four-corner overlay, homography, known-point tests, finding the printed square automatically~~ (found on the printed sheet, and one scored session run on it with the LED)
 5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms and 122 of 123 in the short-flash sweep counted (a dot-sized light still to run)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
 7. ~~Sessions, IndexedDB, history, trend charts, pause, offline service worker~~ (a scored session, pause and

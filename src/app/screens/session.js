@@ -12,6 +12,7 @@ import { confidenceWord, DOT_LIMITS } from '../../detection/params.js';
 import { createFlashPipeline } from '../../detection/pipeline.js';
 import { createSessionClock } from '../../sessions/clock.js';
 import { newSessionId, summarizeSession } from '../../sessions/metrics.js';
+import { createSkipCounter } from '../../sessions/skips.js';
 import { getSessionStore } from '../../sessions/store.js';
 import { icons } from '../../ui/icons.js';
 import { formatClock, sessionSummaryHtml, targetPoints } from '../../ui/sessionView.js';
@@ -395,6 +396,8 @@ export function sessionScreen(root) {
       // times and the session's length are read from it.
       clock: createSessionClock(),
       paused: false,
+      // What was seen and not counted, and why (saved with the session).
+      skips: createSkipCounter(),
       scene: 'warming',
       disturbed: null, // { kind, at } of the latest frame that was not trusted
       video: videoSession,
@@ -417,6 +420,7 @@ export function sessionScreen(root) {
         }
         live.clock.start(frame.now);
         const result = pipeline.process(image.data, frame.now);
+        live.skips.note(result.status, result.event);
         live.scene = result.status;
         if (result.status !== 'ok') live.disturbed = { kind: result.status, at: frame.now };
         if (result.event?.accepted) addHit(result.event);
@@ -464,6 +468,7 @@ export function sessionScreen(root) {
       if (pending?.accepted) addHit(pending);
       live.clock.pause(now);
       live.paused = true;
+      live.skips.breakRun();
       live.disturbed = null;
       live.resetDetector();
       setStatus('info', 'Session paused.', 'Nothing is counted until you resume. Locking the phone or leaving the app still ends the session.');
@@ -603,6 +608,7 @@ export function sessionScreen(root) {
       targetId: session.calibration?.targetId ?? null,
       ...(session.scored ? { printScale: session.printScale, calibratedBy: session.calibratedBy } : {}),
       settings: session.settings,
+      notCounted: session.skips.counts(),
       build: BUILD_ID,
       hits: session.hits,
     };

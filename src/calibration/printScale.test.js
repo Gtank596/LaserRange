@@ -87,6 +87,7 @@ describe('barMmFromMeasurement', () => {
 describe('print scale', () => {
   it('is the measured bar over 50 mm', () => {
     expect(printScaleFromBar(47.5)).toBeCloseTo(0.95, 10);
+    expect(printScaleFromBar(47.6)).toBe(0.952);
     expect(printScaleFromBar(50)).toBe(1);
   });
 

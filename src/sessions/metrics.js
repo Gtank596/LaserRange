@@ -37,6 +37,7 @@ import { getTarget } from '../calibration/targets.js';
  * @property {'found' | 'saved'} [calibratedBy]  how a scored session was lined up: target found by the app, or corners placed by hand
  * @property {number} [printScale]  how big the sheet printed: 0.95 when its 50 mm bar measured 47.5 mm. Absent means 1
  * @property {{ redDelta: number, dotLimit: string }} settings
+ * @property {Record<string, number>} [notCounted]  times something was seen and not counted, by reason (see sessions/skips.js)
  * @property {string} build
  * @property {SessionHit[]} hits
  */

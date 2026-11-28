@@ -2,6 +2,7 @@ import { CHECK_BAR_MM, safePrintScale } from '../calibration/printScale.js';
 import { getTarget } from '../calibration/targets.js';
 import { confidenceWord } from '../detection/params.js';
 import { summarizeSession } from '../sessions/metrics.js';
+import { describeSkips } from '../sessions/skips.js';
 import { targetLegendHtml, targetOverlaySvg } from './targetOverlay.js';
 
 // Shared markup for showing a session: used by the results at the end of a
@@ -115,6 +116,11 @@ export function sessionSummaryHtml(session) {
         <div class="metric"><dt>Length</dt><dd>${formatClock(session.durationMs)}${session.pausedMs >= 1000 ? ` <small>plus ${formatClock(session.pausedMs)} paused</small>` : ''}</dd></div>
         <div class="metric"><dt>On the rings</dt><dd>${summary.scored ? `${summary.onTarget} of ${summary.hits}` : '–'}</dd></div>
         <div class="metric metric--wide"><dt>Group size</dt><dd>${group}</dd></div>
+        ${
+          session.notCounted
+            ? `<div class="metric metric--wide"><dt>Seen but not counted</dt><dd>${describeSkips(session.notCounted)} <small>(times the app saw something and chose not to count it; a flash the camera never caught is not here)</small></dd></div>`
+            : ''
+        }
         <div class="metric"><dt>Source</dt><dd>${session.simulated ? 'Test pattern' : 'Rear camera'}</dd></div>
         <div class="metric"><dt>Detection</dt><dd>${SENSITIVITY_NAMES[session.settings?.redDelta] ?? session.settings?.redDelta} · dot ${DOT_NAMES[session.settings?.dotLimit] ?? session.settings?.dotLimit}</dd></div>
       </dl>

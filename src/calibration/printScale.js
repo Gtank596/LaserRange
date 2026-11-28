@@ -64,7 +64,8 @@ export function barMmFromMeasurement(text, { unit = 'mm', fullSizeMm = CHECK_BAR
 /** 47.5 -> 0.95. Anything unusable -> 1 (printed at full size, as far as the app knows). */
 export function printScaleFromBar(barMm) {
   const value = parseBarMm(barMm);
-  return value === null ? 1 : value / CHECK_BAR_MM;
+  // Four decimal places: finer than any ruler, and it keeps 47.6 / 50 from being saved as 0.9520000000000001.
+  return value === null ? 1 : Math.round((value / CHECK_BAR_MM) * 10000) / 10000;
 }
 
 /** A usable print scale from a saved session, or 1. */
