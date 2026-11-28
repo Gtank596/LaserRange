@@ -40,8 +40,8 @@ export function calibrateScreen(root) {
   root.innerHTML = `
     <main class="screen">
       <header class="app-bar"><a class="back-link" href="#/">${icons.back}Home</a></header>
-      <h1 class="screen-title">Calibrate target</h1>
-      <p class="lede">Point the camera at the printed target. The app looks for the square’s black border and places the four markers on its corners; you can also drag them yourself. The rings drawn over the picture should then sit on the printed rings.</p>
+      <h1 class="screen-title">Place the corners by hand</h1>
+      <p class="lede">You do not normally need this screen: a session finds the printed target by itself when it starts. Use it when the app cannot find the target. Put the four markers on the outer corners of the black border, so that the rings drawn over the picture sit on the printed rings, and save.</p>
 
       <p class="banner" id="cal-status" role="status" aria-live="polite"></p>
 
@@ -78,9 +78,9 @@ export function calibrateScreen(root) {
       </div>
 
       <section class="card" aria-labelledby="cal-saved-title">
-        <div class="card__head"><h2 class="card__title" id="cal-saved-title">Saved calibration</h2></div>
+        <div class="card__head"><h2 class="card__title" id="cal-saved-title">Corners saved by hand</h2></div>
         <p id="cal-saved"></p>
-        <button class="btn btn--secondary btn--block" id="cal-clear" type="button" style="margin-top:12px" hidden>Remove saved calibration</button>
+        <button class="btn btn--secondary btn--block" id="cal-clear" type="button" style="margin-top:12px" hidden>Remove saved corners</button>
       </section>
 
       <a class="row-link" href="#/print">
@@ -377,7 +377,7 @@ export function calibrateScreen(root) {
     drawOverlay();
     if (reason === 'ended') setStatus('error', 'The camera was stopped by the system.', 'Start it again to continue.');
     else if (reason === 'hidden') setStatus('info', 'Paused while in the background.', 'Start the camera again to continue.');
-    else setStatus('info', 'Camera is off.', appState.calibration ? 'Your saved calibration is kept.' : '');
+    else setStatus('info', 'Camera is off.', appState.calibration ? 'Your saved corners are kept.' : '');
   }
 
   function save() {
@@ -395,11 +395,13 @@ export function calibrateScreen(root) {
     renderSaved();
     setStatus(
       'ok',
-      'Calibration saved.',
+      'Corners saved.',
       stored
-        ? 'It is used until the phone or the target moves.'
-        : 'It will be used until you close the app; this browser would not store it.',
+        ? 'Your next session will use these corners. They are only right until the phone or the target moves.'
+        : 'Your next session will use these corners, until you close the app; this browser would not store them.',
     );
+    // Saving corners by hand is a request to use them.
+    appState.sessionOptions.targetMode = 'saved';
   }
 
   const onVisibility = () => {
@@ -416,9 +418,10 @@ export function calibrateScreen(root) {
   findBtn.addEventListener('click', () => findSquare());
   clearBtn.addEventListener('click', () => {
     appState.calibration = null;
+    appState.sessionOptions.targetMode = 'auto';
     clearCalibration();
     renderSaved();
-    setStatus('info', 'Saved calibration removed.');
+    setStatus('info', 'Saved corners removed. Sessions will find the target automatically.');
   });
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('resize', onResize);

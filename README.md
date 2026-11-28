@@ -10,12 +10,13 @@ stays quiet on a still real camera. With an LED test light, the app on the phone
 100 ms, and in a sweep of shorter ones every flash from 50 ms down to 5 ms and 19 of 20 at 2 ms, with no false
 hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser: a real cartridge is
 untested. Target calibration and ring scoring
-work on the test pattern; they have not been tried on a printed target. Live sessions, on-device saving and
+work on the test pattern. On the printed sheet, the app found the square and lined itself up at the first try
+(one sheet, one setup, Nov 28); a session now does this by itself every time it starts. Live sessions, on-device saving and
 History are built. Two sessions have been run on the phone against the LED sweep, the second one with no
 connection: 123 of 123 flashes counted each time, saved, and read back from History. A third session tried
 pause on the phone: the nine flashes sent during the pause and the warm-up after it were left out, as intended.
 History's trend charts and the first-run welcome with its safety reminder are built and checked in a desktop
-browser only. A scored session (with a calibration on a printed target) has not been run.
+browser only. A scored session on the printed target has not been run.
 
 ## What works today
 
@@ -27,11 +28,11 @@ browser only. A scored session (with a calibration on a printed target) has not 
 | Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
-| Printable target: 180 mm square with a 5 mm black border (added Nov 28 so the app can find it; earlier prints have only a thin line and must be reprinted), 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
-| Calibration: the app finds the printed square by its black border and places four markers on its corners; the markers can also be dragged, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built. Finding the square: 18 unit tests on drawn pictures of the sheet (angled, noisy, unevenly lit, on light and dark walls, and things that must not be mistaken for it), corners within 1.5 pixels; on the app's test pattern it places the markers exactly. **Never run on a photo of the printed sheet, and nothing has been tried on a phone or a printed target** |
+| Printable target: 180 mm square with a 5 mm black border (added Nov 28 so the app can find it; earlier prints have only a thin line and must be reprinted), 10 rings, an unlabelled 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
+| Calibration: the app finds the printed square by its black border and places four markers on its corners; the markers can also be dragged, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built. Finding the square: 18 unit tests on drawn pictures of the sheet (angled, noisy, unevenly lit, on light and dark walls, and things that must not be mistaken for it), corners within 1.5 pixels; on the app's test pattern it places the markers exactly. On the iPhone with the printed sheet it was reported to calibrate correctly at the first try (Nov 28; one sheet, one setup, distance and lighting not recorded). **Placing corners by hand has not been tried on a phone** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
-| Live session: counts each flash once, places it on the target and scores it when a calibration is in use, asks the phone to keep its screen awake | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
+| Live session: finds the printed target when it starts and lines itself up (no separate calibration step), counts each flash once, places it on the target and scores it, asks the phone to keep its screen awake. If the target is not found within 5 seconds: try again, count without scores, or use corners placed by hand | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
 | Pause and resume: counting and the session clock stop, the camera stays open, and resuming starts with the 2-second warm-up again | Built; 6 unit tests on the clock. In a desktop browser on the test pattern the clock stood still while paused, nothing was counted, and hits were counted again after resuming. Run once on the iPhone (see "A paused session on the phone") |
 | Saved sessions (IndexedDB on the device) and History: list, one session in full, copy as JSON, delete | Built; 15 unit tests against a stand-in database, and saved, reloaded and deleted in a desktop browser. On the iPhone two sessions were saved and exported from History. **Whether they survive closing the app or restarting the phone is not recorded** |
 | Trend charts in History: accuracy, group size and hits per session, oldest to newest, simulated sessions left out | Built; 13 unit tests on which sessions go into which chart and where the points are drawn. Checked in a desktop browser with made-up records, since removed. **Not seen on the iPhone, and never with real scored sessions** |
@@ -413,16 +414,25 @@ score, and distances can later be given in millimetres.
   as a bigger one further away, so size still comes from a ruler (see the print screen). The paper's own edges
   could serve as a known size (Letter is 215.9 mm wide), but only where they stand out from the wall, and trimmed
   paper would give a wrong answer; this is not built.
-- A calibration is tied to the camera position. If the phone or the target moves, it is wrong until redone; the
-  app cannot detect that yet.
-- A calibration is only used with the source and picture size it was made with.
+- **A session lines itself up when it starts.** Start session opens the camera and looks for the square every
+  350 ms. When two looks in a row find it in the same place (so the phone has stopped moving and the camera has
+  settled), the session uses those corners and begins counting. Nothing is saved between sessions, so each one
+  is lined up for where the phone and the target are now. If the square is not found within 5 seconds the
+  session offers: try again, count hits without scores, or use corners placed by hand if some are saved.
+- If the phone or the target moves during a session, positions are wrong from then on. The app does not detect
+  that; end the session and start another.
+- Placing the corners by hand (the old calibrate screen) is kept as a fallback, reached from the "could not find
+  the target" message. Corners saved there are used by the next session, and only with the source and picture
+  size they were made with.
+- Under Detection settings a session can also be told to use no target at all, for tests with a bare LED.
 - With a calibration in use, detection watches only the target area, so movement elsewhere is ignored.
 
 ## Unverified assumptions
 
 - **Calibration accuracy.** Checked against known points in software only. How precisely corners can be placed
   by hand on a phone, lens distortion, and a sheet that is not flat are all unmeasured.
-- **Finding the square on real paper.** Tested on drawn pictures only. Glare on the ink, shadows across the
+- **Finding the square on real paper.** Reported to work at the first try on the iPhone (one sheet, one setup).
+  Beyond that, tested on drawn pictures only. Glare on the ink, shadows across the
   border, curled paper, a patterned wall and other black-bordered things in view (a picture frame, a monitor)
   are all untried. The check for white paper outside the border means a sheet trimmed to the border, or mounted
   on something dark with no white showing, will not be found.
@@ -511,7 +521,7 @@ classification, pixel analysis) is kept free of DOM access so it can be tested i
 1. ~~Scaffold, theme, dashboard~~
 2. ~~Camera permission flow, preview, frame telemetry~~ (iPhone run pending)
 3. ~~Simulation: controllable synthetic flashes and deterministic detection fixtures~~ (full-frame-rate run pending)
-4. ~~Calibration: four-corner overlay, homography, known-point tests~~ (printed-target run pending)
+4. ~~Calibration: four-corner overlay, homography, known-point tests, finding the printed square automatically~~ (found on the printed sheet once; a scored session on it still to run)
 5. ~~Arduino LED fixture~~: built; 30 of 30 flashes of 100 ms and 122 of 123 in the short-flash sweep counted (a dot-sized light still to run)
 6. Real pipeline: detection on camera frames, thresholds, measured hit/miss rates (**go/no-go Dec 5**)
 7. ~~Sessions, IndexedDB, history, trend charts, pause, offline service worker~~ (a scored session, pause and

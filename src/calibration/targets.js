@@ -65,9 +65,10 @@ export function sheetSizeMm(target = getTarget()) {
  * Light lines on white so a red dot stays visible everywhere on it.
  * The square is drawn as a bold black border: its outer corners are the four
  * calibration corners, and the border is what the app looks for when it finds
- * the square by itself (calibration/findSquare.js). The check bar and its
- * caption sit inside the border, in the bottom-left corner clear of the
- * rings, so the sheet is no taller than it is wide.
+ * the square by itself (calibration/findSquare.js). The check bar sits inside
+ * the border, in the bottom-left corner clear of the rings, so the sheet is no
+ * taller than it is wide. It carries no caption: the print screen says what it
+ * is for, and the sheet stays plain.
  * @param {TargetDefinition} target
  */
 export function printableTargetSvg(target = getTarget()) {
@@ -102,9 +103,6 @@ export function printableTargetSvg(target = getTarget()) {
     <path d="M${c - target.outerRingRadiusMm} ${c}H${c + target.outerRingRadiusMm}M${c} ${c - target.outerRingRadiusMm}V${c + target.outerRingRadiusMm}" stroke="#999" stroke-width="0.2"/>
     ${rings.join('')}
     <g font-family="Arial, Helvetica, sans-serif" font-size="3.4" fill="#555">${labels.join('')}</g>
-    <g font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000">
-      <path d="M${barX} ${barY}h${SHEET_BAR_MM}M${barX} ${barY - 1.2}v2.4M${barX + SHEET_BAR_MM} ${barY - 1.2}v2.4" stroke="#000" stroke-width="0.4" fill="none"/>
-      <text x="${barX}" y="${barY - 3}">this bar: ${SHEET_BAR_MM} mm at 100%</text>
-    </g>
+    <path d="M${barX} ${barY}h${SHEET_BAR_MM}M${barX} ${barY - 1.2}v2.4M${barX + SHEET_BAR_MM} ${barY - 1.2}v2.4" stroke="#000" stroke-width="0.4" fill="none"/>
   </svg>`;
 }

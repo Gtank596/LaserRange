@@ -34,6 +34,7 @@ import { getTarget } from '../calibration/targets.js';
  * @property {boolean} simulated  true for the test pattern: not a real camera session
  * @property {boolean} scored     a calibration was in use
  * @property {string | null} targetId
+ * @property {'found' | 'saved'} [calibratedBy]  how a scored session was lined up: target found by the app, or corners placed by hand
  * @property {number} [printScale]  how big the sheet printed: 0.95 when its 50 mm bar measured 47.5 mm. Absent means 1
  * @property {{ redDelta: number, dotLimit: string }} settings
  * @property {string} build

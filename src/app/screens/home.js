@@ -64,11 +64,6 @@ export function homeScreen(root) {
 
       <ul class="readiness" aria-label="Readiness">
         ${cameraChip}
-        ${
-          appState.calibration
-            ? `<li class="chip chip--ok">${icons.check}Calibration saved</li>`
-            : `<li class="chip">${icons.circle}Not calibrated</li>`
-        }
         <li class="chip" id="home-offline" hidden></li>
       </ul>
 
@@ -77,9 +72,9 @@ export function homeScreen(root) {
         <a class="btn btn--secondary" href="#/history">${icons.clock}History</a>
       </nav>
 
-      <a class="row-link" href="#/calibrate">
+      <a class="row-link" href="#/print">
         ${icons.target}
-        <span class="row-link__text">Calibrate target<small>Line up the printed square so hits can be scored</small></span>
+        <span class="row-link__text">Print the target<small>The sheet a session looks for and scores hits on</small></span>
         ${icons.forward}
       </a>
 
