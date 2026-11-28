@@ -1080,3 +1080,298 @@ details.card[open] > summary {
     transition: none !important;
   }
 }
+
+/* ---------- Paper: the guide and the gift card ---------- */
+/* Both are drawn as white paper on screen, so what is read is what prints. */
+
+.paper-screen .no-print {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.card-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.paper {
+  padding: var(--space-4);
+  border-radius: var(--radius-s);
+  background: #fff;
+  color: #16212b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1em;
+}
+
+.guide section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  break-inside: avoid;
+}
+
+.guide__brand {
+  color: #285d51;
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.guide h1 {
+  font-size: 1.7em;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.guide h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid #c9d3d9;
+  font-size: 1.08em;
+  font-weight: 700;
+}
+
+.guide h2 span {
+  display: inline-grid;
+  width: 1.5em;
+  height: 1.5em;
+  flex: none;
+  border-radius: 50%;
+  background: #285d51;
+  color: #fff;
+  font-size: 0.85em;
+  place-items: center;
+}
+
+.guide ol,
+.guide ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  margin: 0;
+  padding-left: 1.35em;
+}
+
+.guide ol {
+  list-style: decimal;
+}
+
+.guide ul {
+  list-style: disc;
+}
+
+.guide dl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  margin: 0;
+}
+
+.guide dl > div {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 0.8em;
+}
+
+.guide dl.guide__fixes > div {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.guide dt {
+  font-weight: 700;
+}
+
+.guide dd {
+  margin: 0;
+}
+
+.guide__note {
+  color: #45535e;
+  font-size: 0.93em;
+}
+
+.guide__with-code {
+  display: flex;
+  align-items: flex-start;
+  gap: 1em;
+}
+
+.guide__with-code ol {
+  flex: 1;
+}
+
+.guide__code {
+  display: flex;
+  width: 34mm;
+  flex: none;
+  flex-direction: column;
+  gap: 0.2em;
+  margin: 0;
+}
+
+.guide__code figcaption {
+  font-size: 0.6em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.qr {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.guide__safety {
+  padding: 0.7em 0.9em;
+  border: 2px solid #16212b;
+  border-radius: 6px;
+}
+
+.guide__safety h2 {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.guide__foot {
+  color: #6a7781;
+  font-size: 0.75em;
+}
+
+/* The card keeps its 2:3 shape at any width; every size inside it is a share
+   of the card's width (cqw), so screen and paper show the same layout. The
+   padding sits on an inner box because cqw on the card itself would be
+   measured against the page, not the card. */
+.gift-card {
+  width: 100%;
+  max-width: 101.6mm;
+  align-self: center;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-s);
+  background: #fff;
+  color: #16212b;
+  container-type: inline-size;
+}
+
+.gift-card__inner {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 7cqw 8cqw;
+  text-align: center;
+}
+
+.gift-card__inner > * {
+  margin: 0;
+}
+
+.gift-card__brand {
+  display: flex;
+  align-items: center;
+  gap: 2.5cqw;
+  color: #285d51;
+  font-size: 4.4cqw;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.gift-card__brand svg {
+  width: 9cqw;
+  height: 9cqw;
+}
+
+.gift-card__to {
+  margin-top: 5cqw;
+  font-size: 9.5cqw;
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.gift-card__message {
+  margin-top: 2.5cqw;
+  font-size: 4.3cqw;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.gift-card__code {
+  width: 48cqw;
+  margin-top: auto;
+}
+
+.gift-card__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8cqw;
+  margin-top: 2cqw;
+  padding-left: 5cqw;
+  font-size: 3.6cqw;
+  line-height: 1.3;
+  list-style: decimal;
+  text-align: left;
+}
+
+.gift-card__address {
+  margin-top: 2.5cqw;
+  color: #45535e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 3cqw;
+}
+
+.gift-card__from {
+  margin-top: auto;
+  padding-top: 3cqw;
+  font-size: 4.6cqw;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  .paper {
+    padding: 0;
+    border-radius: 0;
+    font-size: 10pt;
+  }
+
+  /* Plain blocks, not a flex column: browsers split blocks across pages more
+     dependably, and each section stays whole. */
+  .guide {
+    display: block;
+  }
+
+  .guide > * + * {
+    margin-top: 1.1em;
+  }
+
+  .gift-card {
+    width: 101.6mm;
+    border-radius: 0;
+    /* The line to cut along. */
+    outline: 0.25mm dashed #777;
+    break-inside: avoid;
+  }
+}

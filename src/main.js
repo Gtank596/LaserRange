@@ -2,6 +2,8 @@ import './styles/app.css';
 import { startRouter } from './app/router.js';
 import { calibrateScreen } from './app/screens/calibrate.js';
 import { cameraScreen } from './app/screens/camera.js';
+import { cardScreen } from './app/screens/card.js';
+import { guideScreen } from './app/screens/guide.js';
 import { historyScreen, sessionDetailScreen } from './app/screens/history.js';
 import { homeScreen } from './app/screens/home.js';
 import { labScreen } from './app/screens/lab.js';
@@ -17,6 +19,8 @@ startRouter(document.getElementById('app'), {
   '': homeScreen,
   calibrate: calibrateScreen,
   print: printScreen,
+  guide: guideScreen,
+  card: cardScreen,
   camera: cameraScreen,
   lab: labScreen,
   session: sessionScreen,

@@ -6,6 +6,9 @@ const stroke = (body) =>
 
 export const icons = {
   logo: stroke('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/>'),
+  book: stroke('<path d="M5 4.5h10.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3V4.5z"/><path d="M9 9h6"/><path d="M9 13h4"/>'),
+  print: stroke('<path d="M7 8V4h10v4"/><rect x="3.5" y="8" width="17" height="8.5" rx="1.5"/><path d="M7 13.5h10V20H7z"/>'),
+  gift: stroke('<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M3 9h18"/><path d="M12 9v11"/><path d="M12 9c-2.5 0-4.5-1-4.5-2.8S10 3.6 12 9c2-5.4 4.5-4.6 4.5-2.8S14.5 9 12 9z"/>'),
   check: stroke('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   circle: stroke('<circle cx="12" cy="12" r="8" stroke-dasharray="3 3.3"/>'),
   alert: stroke('<path d="M12 3.5L2.5 20h19L12 3.5z"/><path d="M12 10v4.5"/><path d="M12 17.3v.2"/>'),

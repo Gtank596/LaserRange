@@ -78,6 +78,12 @@ export function homeScreen(root) {
         ${icons.forward}
       </a>
 
+      <a class="row-link" href="#/guide">
+        ${icons.book}
+        <span class="row-link__text">Guide<small>Setup and use, to read or print, and a gift card</small></span>
+        ${icons.forward}
+      </a>
+
       <a class="row-link" href="#/camera">
         ${icons.camera}
         <span class="row-link__text">Camera check<small>Measure real frame timing on this device</small></span>
