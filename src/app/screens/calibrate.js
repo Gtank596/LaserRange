@@ -1,6 +1,8 @@
 import { createMapper, validateCorners } from '../../calibration/calibration.js';
+import { findTargetSquare } from '../../calibration/findSquare.js';
 import { calibrationFits, clearCalibration, saveCalibration } from '../../calibration/store.js';
-import { DEFAULT_TARGET_ID, getTarget } from '../../calibration/targets.js';
+import { DEFAULT_TARGET_ID, frameShare, getTarget } from '../../calibration/targets.js';
+import { createFrameGrabber } from '../../camera/frameSampler.js';
 import { startVideoSession } from '../../camera/videoSession.js';
 import { icons } from '../../ui/icons.js';
 import { attachBuildFooter, buildFooterHtml } from '../build.js';
@@ -9,6 +11,18 @@ import { appState } from '../state.js';
 const CORNER_NAMES = ['top left', 'top right', 'bottom right', 'bottom left'];
 const LOUPE_SIZE = 132; // CSS pixels
 const LOUPE_ZOOM = 3;
+/** Widest picture the square finder looks at. Bigger is slower; smaller loses a thin border. */
+const FIND_WIDTH = 960;
+/** How long after the camera starts the finder is first tried, so the picture has settled. */
+const FIND_DELAY_MS = 700;
+
+// Why the finder came up empty, in words someone can act on.
+const NOT_FOUND = {
+  nothing:
+    'Nothing in view looks like the black border. Use the sheet with the bold black border, keep all of it in the picture, and move closer if the square is small. Or drag the markers by hand.',
+  unclear:
+    'Something like a border is in view, but it does not match the printed one. Check that nothing covers or shades the border, that there is white paper all round it, and that all of it is in the picture. Or drag the markers by hand.',
+};
 
 const defaultCorners = () => [
   { x: 0.2, y: 0.2 },
@@ -27,7 +41,7 @@ export function calibrateScreen(root) {
     <main class="screen">
       <header class="app-bar"><a class="back-link" href="#/">${icons.back}Home</a></header>
       <h1 class="screen-title">Calibrate target</h1>
-      <p class="lede">Drag the four numbered markers onto the corners of the printed square. The rings drawn over the picture should then sit on the printed rings.</p>
+      <p class="lede">Point the camera at the printed target. The app looks for the square’s black border and places the four markers on its corners; you can also drag them yourself. The rings drawn over the picture should then sit on the printed rings.</p>
 
       <p class="banner" id="cal-status" role="status" aria-live="polite"></p>
 
@@ -56,7 +70,7 @@ export function calibrateScreen(root) {
         </div>
       </div>
 
-      <button class="btn btn--secondary btn--block" id="cal-snap" type="button" hidden>Place markers on the test pattern</button>
+      <button class="btn btn--secondary btn--block" id="cal-find" type="button" hidden>${icons.target}Find the square</button>
 
       <div class="actions">
         <button class="btn btn--secondary" id="cal-toggle" type="button"></button>
@@ -79,7 +93,8 @@ export function calibrateScreen(root) {
         <summary>Getting a good calibration</summary>
         <ul class="notes">
           <li>Fix the phone in place first (a tripod or a stack of books). If the phone or the target moves afterwards, calibrate again.</li>
-          <li>Marker 1 goes on the top-left corner of the printed square, then 2, 3 and 4 clockwise.</li>
+          <li>“Find the square” looks for the bold black border. It needs the whole border in the picture, white paper showing all round it, and the square filling at least an eighth of the picture’s shorter side. It has been tried on drawn pictures only, so check its answer against the rings.</li>
+          <li>The corners are the outer corners of the black border. Marker 1 goes on the top-left one, then 2, 3 and 4 clockwise.</li>
           <li>While you drag, a magnified view appears so your finger does not hide the corner. On a keyboard, arrow keys nudge a marker; hold Shift for bigger steps.</li>
           <li>The camera does not need to be square-on. An angled view is corrected, but a very steep angle makes positions less precise.</li>
           <li>Accuracy has only been checked with known points in software so far, not against a measured printed target.</li>
@@ -101,7 +116,7 @@ export function calibrateScreen(root) {
   const toggleBtn = $('#cal-toggle');
   const saveBtn = $('#cal-save');
   const resetBtn = $('#cal-reset');
-  const snapBtn = $('#cal-snap');
+  const findBtn = $('#cal-find');
   const clearBtn = $('#cal-clear');
   const sourceSel = $('#cal-source');
   const handles = [...root.querySelectorAll('.corner')];
@@ -111,6 +126,8 @@ export function calibrateScreen(root) {
   let session = null;
   let corners = defaultCorners();
   let dragging = -1;
+  let grabber = null;
+  let findTimer = 0;
 
   function setStatus(kind, title, detail = '') {
     const icon = kind === 'ok' ? icons.check : kind === 'error' ? icons.alert : icons.info;
@@ -134,7 +151,7 @@ export function calibrateScreen(root) {
     toggleBtn.disabled = starting;
     sourceSel.disabled = running || starting;
     resetBtn.disabled = !running;
-    snapBtn.hidden = !(running && session.isSynthetic);
+    findBtn.hidden = !running;
     handles.forEach((handle) => (handle.hidden = !running));
     placeholder.hidden = running;
     saveBtn.disabled = !running || !validateCorners(corners).ok;
@@ -150,7 +167,7 @@ export function calibrateScreen(root) {
     if (!session) return;
     const check = validateCorners(corners);
     saveBtn.disabled = !check.ok;
-    if (check.ok) setStatus('info', 'Line up the markers.', 'When the drawn rings sit on the printed rings, press Save.');
+    if (check.ok) setStatus('info', 'Line up the markers.', 'Press “Find the square”, or drag them. When the drawn rings sit on the printed rings, press Save.');
     else setStatus('error', 'These corners cannot be used.', check.reason);
   }
 
@@ -248,6 +265,28 @@ export function calibrateScreen(root) {
     ctx.stroke();
   }
 
+  /**
+   * Looks for the printed border in the current picture and, if it is there,
+   * puts the markers on its corners.
+   * @param {{ quiet?: boolean }} [options] quiet: say nothing when it is not found (the automatic first try)
+   */
+  function findSquare({ quiet = false } = {}) {
+    if (!session || dragging >= 0) return;
+    const image = grabber?.grab(video);
+    const result = image
+      ? findTargetSquare(image.data, image.width, image.height, { frameShare: frameShare(target) })
+      : { found: false, reason: 'nothing' };
+    if (result.found) {
+      corners = result.corners.map((corner) => ({ x: clamp01(corner.x), y: clamp01(corner.y) }));
+      render();
+      if (validateCorners(corners).ok) {
+        setStatus('ok', 'Found the printed square.', 'Check that the drawn rings sit on the printed rings, then press Save. Drag a marker if one is off.');
+      }
+      return;
+    }
+    if (!quiet) setStatus('error', 'Could not find the printed square.', NOT_FOUND[result.reason] ?? NOT_FOUND.nothing);
+  }
+
   function moveCorner(index, x, y) {
     corners[index] = { x: clamp01(x), y: clamp01(y) };
     render();
@@ -316,16 +355,22 @@ export function calibrateScreen(root) {
 
     // Start from the saved corners when they were made with this same source and frame size.
     const saved = appState.calibration;
-    corners = calibrationFits(saved, source, video) ? saved.corners.map((corner) => ({ ...corner })) : defaultCorners();
+    const restored = calibrationFits(saved, source, video);
+    corners = restored ? saved.corners.map((corner) => ({ ...corner })) : defaultCorners();
+    grabber = createFrameGrabber({ width: Math.min(FIND_WIDTH, video.videoWidth || FIND_WIDTH) });
     renderControls();
     render();
+    // With nothing saved to start from, look for the square straight away.
+    if (!restored) findTimer = window.setTimeout(() => findSquare({ quiet: true }), FIND_DELAY_MS);
   }
 
   /** @param {'user' | 'hidden' | 'ended' | 'unmount'} reason */
   function stop(reason) {
     if (!session) return;
+    window.clearTimeout(findTimer);
     session.stop();
     session = null;
+    grabber = null;
     loupe.hidden = true;
     if (reason === 'unmount') return;
     renderControls();
@@ -368,11 +413,7 @@ export function calibrateScreen(root) {
     corners = defaultCorners();
     render();
   });
-  snapBtn.addEventListener('click', () => {
-    if (!session?.synthetic) return;
-    corners = session.synthetic.corners.map((corner) => ({ ...corner }));
-    render();
-  });
+  findBtn.addEventListener('click', () => findSquare());
   clearBtn.addEventListener('click', () => {
     appState.calibration = null;
     clearCalibration();

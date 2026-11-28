@@ -46,12 +46,12 @@ export function printScreen(root) {
       <div class="no-print">
         <header class="app-bar"><a class="back-link" href="#/calibrate">${icons.back}Calibrate</a></header>
         <h1 class="screen-title">Print the target</h1>
-        <p class="lede">${target.name}: a ${target.squareMm} mm square with ${target.ringCount} rings. It fits on Letter or A4 paper.</p>
+        <p class="lede">${target.name}: a ${target.squareMm} mm square with a bold black border and ${target.ringCount} rings. It fits on Letter or A4 paper. The app finds the square by its border, so a sheet printed before the border was added has to be printed again.</p>
         <ol class="steps">
           <li>Press Print. In the print window choose <strong>100%</strong> or <strong>Actual size</strong>, and turn off anything called “Fit to page”, “Shrink to fit” or “Fit to printable area”.</li>
-          <li>Measure the printed sheet with a ruler: one side of the square (${target.squareMm} mm, ${inchFraction(target.squareMm)} in at full size), or the bar near the bottom of it (${CHECK_BAR_MM} mm, ${inchFraction(CHECK_BAR_MM)} in).</li>
+          <li>Measure the printed sheet with a ruler: one side of the square, from outer edge to outer edge of the black border (${target.squareMm} mm, ${inchFraction(target.squareMm)} in at full size), or the bar in its bottom-left corner (${CHECK_BAR_MM} mm, ${inchFraction(CHECK_BAR_MM)} in).</li>
           <li>Enter what you measured below. The target works at any size: ring scores do not depend on it.</li>
-          <li>Mount the sheet flat. A curled or creased sheet bends the square and shifts where hits are placed.</li>
+          <li>Mount the sheet flat, and leave the white paper around the border showing: do not trim it off. A curled or creased sheet bends the square and shifts where hits are placed.</li>
         </ol>
         <button class="btn btn--primary btn--block" id="print-button" type="button">Print</button>
         <p class="fine-print">Printing is usually easiest from a computer: open this same page there.</p>

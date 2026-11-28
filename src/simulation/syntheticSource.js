@@ -5,7 +5,7 @@
 // It is a software test pattern only. A display-rate canvas says nothing about
 // how a real camera sensor captures a short laser flash.
 
-import { getTarget, ringShare } from '../calibration/targets.js';
+import { frameShare, getTarget, ringShare } from '../calibration/targets.js';
 
 /**
  * @param {object} [options]
@@ -47,6 +47,8 @@ export function createSyntheticSource({
   const cy = height / 2;
   const radius = Math.min(width, height) * 0.4; // outer ring
   const halfSide = radius / ringShare(target); // half the square's side
+  const border = halfSide * 2 * frameShare(target); // the black border's thickness
+  const paperMargin = halfSide * 2 * (6 / target.squareMm); // paper showing around the square
   const dotRadius = Math.max(2, Math.min(width, height) * dotSize);
   const corners = [
     { x: (cx - halfSide) / width, y: (cy - halfSide) / height },
@@ -64,10 +66,12 @@ export function createSyntheticSource({
     ctx.fillRect(0, 0, width, height);
 
     ctx.fillStyle = '#d9dfe3'; // "paper"
-    ctx.fillRect(cx - halfSide, cy - halfSide, halfSide * 2, halfSide * 2);
+    ctx.fillRect(cx - halfSide - paperMargin, cy - halfSide - paperMargin, (halfSide + paperMargin) * 2, (halfSide + paperMargin) * 2);
+    // The printed square's black border: its outer edge is the square.
+    ctx.strokeStyle = '#161c21';
+    ctx.lineWidth = border;
+    ctx.strokeRect(cx - halfSide + border / 2, cy - halfSide + border / 2, halfSide * 2 - border, halfSide * 2 - border);
     ctx.strokeStyle = '#3a4650';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(cx - halfSide, cy - halfSide, halfSide * 2, halfSide * 2);
     for (let i = 1; i <= target.ringCount; i++) {
       ctx.lineWidth = i % 2 === 0 ? 2 : 1;
       ctx.beginPath();

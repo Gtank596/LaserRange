@@ -8,7 +8,8 @@
  * @typedef {object} TargetDefinition
  * @property {string} id
  * @property {string} name
- * @property {number} squareMm          side of the printed calibration square
+ * @property {number} squareMm          side of the printed calibration square, measured to the border's outer edge
+ * @property {number} frameMm           thickness of the black border, which runs just inside the square's edge
  * @property {number} outerRingRadiusMm radius of the outermost scoring ring
  * @property {number} ringCount         rings, scoring ringCount at the centre down to 1
  */
@@ -19,6 +20,7 @@ export const TARGETS = {
     id: 'lr-10',
     name: 'LaserRange 10-ring',
     squareMm: 180,
+    frameMm: 5,
     outerRingRadiusMm: 80,
     ringCount: 10,
   },
@@ -36,7 +38,12 @@ export function ringShare(target) {
   return target.outerRingRadiusMm / (target.squareMm / 2);
 }
 
-/** White space around the square on the printed sheet, mm: just enough for the corner marks. */
+/** Border thickness as a share of the square's side: what the square finder looks for. */
+export function frameShare(target) {
+  return target.frameMm / target.squareMm;
+}
+
+/** White space around the square on the printed sheet, mm. The page's own margin adds more. */
 const SHEET_MARGIN_MM = 1.5;
 /** Length of the ruler-check bar on the sheet at 100%, mm. */
 export const SHEET_BAR_MM = 50;
@@ -56,7 +63,10 @@ export function sheetSizeMm(target = getTarget()) {
 /**
  * The target as an SVG sized in real millimetres, for printing at 100%.
  * Light lines on white so a red dot stays visible everywhere on it.
- * The check bar and its caption sit inside the square, in the strip below the
+ * The square is drawn as a bold black border: its outer corners are the four
+ * calibration corners, and the border is what the app looks for when it finds
+ * the square by itself (calibration/findSquare.js). The check bar and its
+ * caption sit inside the border, in the bottom-left corner clear of the
  * rings, so the sheet is no taller than it is wide.
  * @param {TargetDefinition} target
  */
@@ -79,32 +89,22 @@ export function printableTargetSvg(target = getTarget()) {
     }
   }
 
-  // Heavy corner brackets make the square's corners easy to find in the camera view.
   const a = margin;
   const b = margin + side;
-  const len = 14;
-  const brackets = [
-    `M${a} ${a + len}V${a}H${a + len}`,
-    `M${b - len} ${a}H${b}V${a + len}`,
-    `M${b} ${b - len}V${b}H${b - len}`,
-    `M${a + len} ${b}H${a}V${b - len}`,
-  ]
-    .map((d) => `<path d="${d}" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="square"/>`)
-    .join('');
+  const t = target.frameMm;
 
-  // The strip between the outer ring and the square's bottom edge.
-  const barX = a + 22;
-  const barY = b - 4.5;
+  // The bottom-left corner, between the outer ring and the border.
+  const barX = a + t + 3;
+  const barY = b - t - 3.5;
   return `<svg xmlns="http://www.w3.org/2000/svg" class="print-target" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" role="img" aria-label="${target.name} target, ${side} millimetre square">
     <rect width="${width}" height="${height}" fill="#fff"/>
-    <rect x="${a}" y="${a}" width="${side}" height="${side}" fill="none" stroke="#000" stroke-width="0.8"/>
-    ${brackets}
+    <rect x="${a + t / 2}" y="${a + t / 2}" width="${side - t}" height="${side - t}" fill="none" stroke="#000" stroke-width="${t}"/>
     <path d="M${c - target.outerRingRadiusMm} ${c}H${c + target.outerRingRadiusMm}M${c} ${c - target.outerRingRadiusMm}V${c + target.outerRingRadiusMm}" stroke="#999" stroke-width="0.2"/>
     ${rings.join('')}
     <g font-family="Arial, Helvetica, sans-serif" font-size="3.4" fill="#555">${labels.join('')}</g>
-    <g font-family="Arial, Helvetica, sans-serif" font-size="3.2" fill="#000">
-      <path d="M${barX} ${barY}h${SHEET_BAR_MM}M${barX} ${barY - 2}v4M${barX + SHEET_BAR_MM} ${barY - 2}v4" stroke="#000" stroke-width="0.4" fill="none"/>
-      <text x="${barX + SHEET_BAR_MM + 3}" y="${barY + 1.1}">this bar: ${SHEET_BAR_MM} mm at 100% · square ${side} mm</text>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000">
+      <path d="M${barX} ${barY}h${SHEET_BAR_MM}M${barX} ${barY - 1.2}v2.4M${barX + SHEET_BAR_MM} ${barY - 1.2}v2.4" stroke="#000" stroke-width="0.4" fill="none"/>
+      <text x="${barX}" y="${barY - 3}">this bar: ${SHEET_BAR_MM} mm at 100%</text>
     </g>
   </svg>`;
 }

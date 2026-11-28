@@ -27,8 +27,8 @@ browser only. A scored session (with a calibration on a printed target) has not 
 | Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
-| Printable target: 180 mm square, 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
-| Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
+| Printable target: 180 mm square with a 5 mm black border (added Nov 28 so the app can find it; earlier prints have only a thin line and must be reprinted), 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
+| Calibration: the app finds the printed square by its black border and places four markers on its corners; the markers can also be dragged, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built. Finding the square: 18 unit tests on drawn pictures of the sheet (angled, noisy, unevenly lit, on light and dark walls, and things that must not be mistaken for it), corners within 1.5 pixels; on the app's test pattern it places the markers exactly. **Never run on a photo of the printed sheet, and nothing has been tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
 | Live session: counts each flash once, places it on the target and scores it when a calibration is in use, asks the phone to keep its screen awake | Built; run on the test pattern in a desktop browser, with and without a calibration, and twice on the iPhone without a calibration (see "A session on the phone" and "A session with no connection"). **A scored session on a printed target has not been run** |
@@ -393,12 +393,26 @@ must not be quoted as a capture rate.
 ## How calibration works
 
 The printed target is a square with the rings centred inside it. Seen by a camera at an angle, the square appears
-as a general four-sided shape. From the four corners you mark, the app computes the perspective mapping
+as a general four-sided shape. From the square's four corners, the app computes the perspective mapping
 (a homography) between the picture and the flat sheet, so any spot in the picture can be placed on the target as if
 viewed square-on. Because the printed sizes are known (180 mm square, 80 mm outer ring), a placed spot gets a ring
 score, and distances can later be given in millimetres.
 
-- Marker 1 goes on the square's top-left corner, then clockwise.
+- The corners are the outer corners of the square's black border. Marker 1 goes on the top-left one, then
+  clockwise.
+- **Finding the square.** When the camera starts, and whenever "Find the square" is pressed, the app looks for the
+  border in one frame (`src/calibration/findSquare.js`). It marks pixels clearly darker than their surroundings,
+  groups the ones that touch, reduces each big hollow group's outline to four corners, re-draws each side as the
+  best straight line through the outline, and accepts the result only if the picture is dark along the border
+  band and light just inside and just outside it on all four sides. If nothing passes, it says so and the
+  markers stay where they were. The markers can always be dragged afterwards.
+- It needs the whole border in the picture, white paper showing all round it, and the square at least an eighth
+  of the picture's shorter side. At 960 pixels across, the 5 mm border is about four pixels thick with the phone
+  a metre away; much further and it becomes too thin to find.
+- **It cannot tell how big the sheet printed.** A smaller sheet nearer the camera makes exactly the same picture
+  as a bigger one further away, so size still comes from a ruler (see the print screen). The paper's own edges
+  could serve as a known size (Letter is 215.9 mm wide), but only where they stand out from the wall, and trimmed
+  paper would give a wrong answer; this is not built.
 - A calibration is tied to the camera position. If the phone or the target moves, it is wrong until redone; the
   app cannot detect that yet.
 - A calibration is only used with the source and picture size it was made with.
@@ -408,6 +422,10 @@ score, and distances can later be given in millimetres.
 
 - **Calibration accuracy.** Checked against known points in software only. How precisely corners can be placed
   by hand on a phone, lens distortion, and a sheet that is not flat are all unmeasured.
+- **Finding the square on real paper.** Tested on drawn pictures only. Glare on the ink, shadows across the
+  border, curled paper, a patterned wall and other black-bordered things in view (a picture frame, a monitor)
+  are all untried. The check for white paper outside the border means a sheet trimmed to the border, or mounted
+  on something dark with no white showing, will not be found.
 - **Print scale.** The first print came out at 95% (the 50 mm bar measured 47.5 mm). What shrank it is not
   known: a page cannot see the print window's or the printer's scaling, and the browser and settings used were
   not recorded. Two things were changed in response. The sheet's drawing went from 190 x 210 mm to 183 x 183 mm
@@ -458,7 +476,7 @@ src/
   app/                  router, shared state, build label, wake lock, the first-run welcome's memory, screens (welcome, home, session, history, calibrate, print, camera, lab)
   camera/               stream, video session, frame loop, frame statistics, pixel sampler, feature probe, error messages
   detection/            frame detector, region finder, hit grouping, settings, scoring against ground truth
-  calibration/          perspective mapping, target definitions and printable sheet, ring scoring, saved calibration
+  calibration/          perspective mapping, finding the printed square in a picture, target definitions and printable sheet, print scale, ring scoring, saved calibration
   sessions/             session records and totals, the session clock (pauses left out), trend numbers for History, on-device storage (IndexedDB), sample data for the empty dashboard
   pwa/                  service worker template, the build step that fills it in, registration
   simulation/           test-pattern video source, synthetic frames for tests, illustrative exposure model

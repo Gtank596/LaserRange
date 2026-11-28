@@ -177,15 +177,20 @@ describe('printableTargetSvg', () => {
     }
   });
 
-  it('draws a 50 mm check bar inside the square, clear of the rings and the corner marks', () => {
+  it('draws the square as a 5 mm black border whose outer edge is the 180 mm square', () => {
+    const svg = printableTargetSvg(getTarget());
+    // A 175 mm outline drawn 5 mm thick, centred 2.5 mm in: it covers 0 to 5 mm in from the square's edge.
+    expect(svg).toContain('<rect x="4" y="4" width="175" height="175" fill="none" stroke="#000" stroke-width="5"/>');
+  });
+
+  it('draws a 50 mm check bar inside the border, clear of the border and the rings', () => {
     const svg = printableTargetSvg(getTarget());
     const bar = svg.match(/<path d="M([\d.]+) ([\d.]+)h50M/);
     expect(bar).not.toBeNull();
     const [x, y] = [Number(bar[1]), Number(bar[2])];
-    // square from 1.5 to 181.5; rings end 80 mm from the centre at 91.5; corner marks are 14 mm long
-    expect(y).toBeGreaterThan(91.5 + 80 + 2);
-    expect(y).toBeLessThan(181.5 - 2);
-    expect(x).toBeGreaterThan(1.5 + 14 + 2);
-    expect(x + 50).toBeLessThan(181.5 - 14);
+    // square from 1.5 to 181.5, border 5 mm thick; rings end 80 mm from the centre at (91.5, 91.5)
+    expect(x).toBeGreaterThan(1.5 + 5 + 2);
+    expect(y).toBeLessThan(181.5 - 5 - 2);
+    for (const end of [x, x + 50]) expect(Math.hypot(end - 91.5, y - 91.5)).toBeGreaterThan(80 + 2);
   });
 });
