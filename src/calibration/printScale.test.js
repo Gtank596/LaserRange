@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { groupSizeMm, summarizeSession } from '../sessions/metrics.js';
-import { clearBarMm, loadBarMm, loadPrintScale, parseBarMm, printScaleFromBar, safePrintScale, saveBarMm } from './printScale.js';
+import {
+  barMmFromMeasurement,
+  clearBarMm,
+  loadBarEntry,
+  loadBarMm,
+  loadPrintScale,
+  parseBarMm,
+  parseLength,
+  printScaleFromBar,
+  safePrintScale,
+  saveBarMm,
+} from './printScale.js';
 import { getTarget } from './targets.js';
 
 function fakeStorage() {
@@ -26,6 +37,50 @@ describe('parseBarMm', () => {
 
   it('refuses anything that cannot be a print scale', () => {
     for (const bad of ['', 'abc', '0', '-5', '4.75', '475', 'NaN']) expect(parseBarMm(bad)).toBeNull();
+  });
+});
+
+describe('parseLength', () => {
+  it('reads decimals with a point or a comma, with or without a unit', () => {
+    expect(parseLength('49.2')).toBe(49.2);
+    expect(parseLength('49,2 mm')).toBe(49.2);
+    expect(parseLength('1.94 in')).toBe(1.94);
+    expect(parseLength('.5')).toBe(0.5);
+  });
+
+  it('reads inch fractions the way they are written off a ruler', () => {
+    expect(parseLength('1 15/16')).toBeCloseTo(1.9375, 10);
+    expect(parseLength('1-15/16"')).toBeCloseTo(1.9375, 10);
+    expect(parseLength('7 1/16 inches')).toBeCloseTo(7.0625, 10);
+    expect(parseLength('15/16')).toBeCloseTo(0.9375, 10);
+  });
+
+  it('refuses what is not a length', () => {
+    for (const bad of ['', 'abc', '1/0', '1 2', '-3', '1.2.3', null, undefined]) expect(parseLength(bad)).toBeNull();
+  });
+});
+
+describe('barMmFromMeasurement', () => {
+  it('takes the bar in millimetres as it is', () => {
+    expect(barMmFromMeasurement('47.5')).toBe(47.5);
+  });
+
+  it('converts the bar measured in inches', () => {
+    // 1 15/16 in = 49.2 mm
+    expect(barMmFromMeasurement('1 15/16', { unit: 'in' })).toBe(49.2);
+  });
+
+  it('scales a measurement of the 180 mm square down to the 50 mm bar', () => {
+    expect(barMmFromMeasurement('180', { fullSizeMm: 180 })).toBe(50);
+    expect(barMmFromMeasurement('171', { fullSizeMm: 180 })).toBe(47.5);
+    // 7 1/16 in = 179.4 mm, which is 99.7% of 180
+    expect(barMmFromMeasurement('7 1/16', { unit: 'in', fullSizeMm: 180 })).toBe(49.8);
+  });
+
+  it('refuses a length that cannot be this sheet, such as inches entered as millimetres', () => {
+    expect(barMmFromMeasurement('1 15/16')).toBeNull();
+    expect(barMmFromMeasurement('49.2', { unit: 'in' })).toBeNull();
+    expect(barMmFromMeasurement('abc', { unit: 'in' })).toBeNull();
   });
 });
 
@@ -60,6 +115,16 @@ describe('the saved bar measurement', () => {
     expect(loadPrintScale(storage)).toBeCloseTo(0.95, 10);
     clearBarMm(storage);
     expect(loadBarMm(storage)).toBeNull();
+  });
+
+  it('keeps what was typed, for showing it back', () => {
+    const storage = fakeStorage();
+    expect(loadBarEntry(storage)).toBeNull();
+    saveBarMm(49.2, storage, new Date(), { text: '1 15/16', unit: 'in', of: 'bar' });
+    expect(loadBarMm(storage)).toBe(49.2);
+    expect(loadBarEntry(storage)).toEqual({ text: '1 15/16', unit: 'in', of: 'bar' });
+    saveBarMm(47.5, storage);
+    expect(loadBarEntry(storage)).toBeNull();
   });
 
   it('does not save an unusable measurement', () => {

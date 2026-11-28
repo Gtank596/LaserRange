@@ -27,7 +27,7 @@ browser only. A scored session (with a calibration on a printed target) has not 
 | Flash detection: red-spot finder, one hit per flash, rejection of lighting changes, movement and lingering red objects | Built; 33 deterministic unit tests on synthetic frames |
 | Detection lab: runs detection on the test pattern and scores it against the flashes it drew; can also watch the rear camera | Built; run on an iPhone on the test pattern, on a still camera scene and on the LED test light (see "Measured so far"). **LED flashes: 30 of 30 at 100 ms; 20 of 20 at each of 50, 30, 20, 10 and 5 ms; 19 of 20 at 2 ms; no false hits. One run each. A laser is untested** |
 | LED test light (Arduino): 30 flashes of 100 ms, one per second; a sweep of shorter flashes | Built by hand; sketches in `hardware/`. Both have been run against the phone |
-| Printable target: 180 mm square, 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm. **The new sheet has not been printed and measured** |
+| Printable target: 180 mm square, 10 rings, 50 mm check bar inside the square; the measured length of the bar can be entered so millimetre figures are right at any print size | Built. The first print (Nov 27, the earlier 190 x 210 mm sheet) came out at 95%: the bar measured 47.5 mm. The sheet was then cut down to 183 x 183 mm, and the second print's bar measured 1 15/16 in (49.2 mm, 98.4%) on a ruler marked in sixteenths. On that ruler 50 mm falls halfway between the 1 15/16 and 2 inch marks, so this is between about 97% and 100%. The measurement can be entered in millimetres or inches, of the bar or of one side of the square. **A measurement of the square's side, which would settle it, has not been taken** |
 | Calibration: drag four markers onto the printed square's corners, with a magnifier and keyboard nudging; rings are drawn over the picture to confirm the fit; saved on the device | Built; checked on the test pattern on desktop. **Not yet tried on a phone or a printed target** |
 | Perspective correction and ring scoring | Built; 19 unit tests with known points seen at an angle. In the lab on the calibrated test pattern, 8 of 8 hits got the expected ring, positions within 0.05% of the ring radius |
 | Detection limited to the calibrated target area | Built and unit tested |
@@ -413,8 +413,10 @@ score, and distances can later be given in millimetres.
   not recorded. Two things were changed in response. The sheet's drawing went from 190 x 210 mm to 183 x 183 mm
   (the bar and caption moved inside the square), which fits inside half-inch margins on Letter and A4, so a
   browser has less reason to shrink it. And the print screen takes the bar's measured length, which corrects
-  millimetre figures whatever the print size. Ring scores never depended on print size. Whether the new sheet
-  prints at 100% has not been checked.
+  millimetre figures whatever the print size. Ring scores never depended on print size. The new sheet's bar
+  measured 1 15/16 in (49.2 mm) on a sixteenth-inch ruler: closer, and within that ruler's reach of full size,
+  but not shown to be exactly 100%. Measuring a side of the square (7 3/32 in at full size) would be about three
+  and a half times finer. Even at 98.4% a 40 mm group would be off by well under a millimetre.
 - **Detection settings.** Chosen against synthetic frames, plus one recording of an LED. The true size and
   brightness of a laser dot on paper are unmeasured, so the 1% dot size limit is a guess. With a calibration the
   limit is 1% of the target area, which is smaller still and has never been tried on a real light.
