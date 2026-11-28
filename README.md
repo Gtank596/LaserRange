@@ -9,7 +9,7 @@ sample data. The camera check is real and measures frame timing. Flash detection
 stays quiet on a still real camera. With an LED test light, the app on the phone counted 30 of 30 flashes of
 100 ms, and in a sweep of shorter ones every flash from 50 ms down to 5 ms and 19 of 20 at 2 ms, with no false
 hits (one run each; see "First real flashes" and "Short flashes"). An LED is not the laser. The laser cartridge
-has now been tried once (Nov 28): the app counted 52 flashes and placed them on the target, but how many
+has now been tried once (Nov 28), set off by pressing it with a finger and not in a firearm: the app counted 52 flashes and placed them on the target, but how many
 flashes were fired was not recorded, so nothing is known yet about misses (see "The first run with the laser
 cartridge"). Target calibration and ring scoring
 work on the test pattern. On the printed sheet, the app found the square and lined itself up at the first try
@@ -415,9 +415,9 @@ started, and the session lasted 30 seconds. Exported from History.
 
 Nov 28, 2026, build `7fd819c` (the build before the "seen but not counted" tally), iPhone, the printed sheet.
 Source Rear camera, Sensitivity Normal, Dot size limit Normal, Target found automatically. A Mantis Pink Rhino
-9mm cartridge, tried by Gabriel. 49 seconds. Exported from History. How the cartridge was set off, how far away
-it was, and **how many times it flashed were not recorded**, so this run says what was counted and nothing
-about what was missed.
+9mm cartridge, tried by Gabriel, who set it off by pressing it with a finger: **it was not in a firearm.**
+49 seconds. Exported from History. How far away it was was not recorded, and **the flashes were not counted**,
+so this run says what the app counted and nothing about what it missed.
 
 - **52 flashes were counted and placed on the target.** 49 landed on the rings, from the 10 out to ring 1, and
   3 outside. The positions wander all over the target, as they would if the dot was being moved about rather
@@ -428,9 +428,13 @@ about what was missed.
   of them 12 or more, 43 of the 52 between 9 and 16. At 60 frames a second that is roughly 70 to 400 ms lit,
   typically about 200 ms. This is what the camera saw in one run, not the cartridge's specification. The first
   four flashes, about 1.1 s apart, were lit for 22 to 24 frames; the later ones, as little as 0.27 s apart,
-  mostly 9 to 15. Why the length varies is not known.
-- So for this cartridge, catching a flash that falls between frames, the worry behind the LED sweep, does not
-  look like the risk. The app's own limits do:
+  mostly 9 to 15. The likeliest reason is that the light stays on for as long as the finger presses, so slow
+  presses gave long flashes and quick ones short ones. That is a guess. Either way, **these lengths are finger
+  presses and say nothing about how long the flash lasts when the cartridge is used in a firearm.** That is
+  still unknown and may be much shorter.
+- With flashes as long as these, catching one that falls between frames is not the risk; the app's own limits
+  are. This holds for finger presses only. For real use the worry behind the LED sweep (a short flash caught
+  in one frame or none) still stands until the flash length there is measured:
   - **"Stayed lit too long" was set at 400 ms**, and four of the counted flashes were within a frame or two of
     it. Any flash a little longer would have been refused, and this run cannot say whether that happened. The
     limit is now 1000 ms. That is a guess with room to spare, not a measured upper limit.
@@ -452,8 +456,8 @@ about what was missed.
 - Not known from this run: how many flashes were missed or refused; whether positions are right (there was no
   known aim point); the dot's size in the picture; behaviour at another distance or in other light.
 
-Still unknown: how many cartridge flashes go uncounted, and why; whether the lit time seen here holds for other
-ways of using the cartridge; flashes under 2 ms (which this cartridge does not seem to produce).
+Still unknown: how many cartridge flashes go uncounted, and why; how long the flash lasts when the cartridge is
+used in a firearm (the lit times here are finger presses); flashes under 2 ms.
 
 ## How detection works
 
@@ -562,11 +566,12 @@ score, and distances can later be given in millimetres.
   to read or control. This has to be measured with the LED fixture, not inferred from frame rate.
 - **Pulse duration.** The Pink Rhino's pulse length is not known from its maker. In one run the camera saw
   flashes lit for roughly 70 to 400 ms (see "The first run with the laser cartridge"). The code assumes only
-  that a flash is over within 1000 ms, which is a guess.
+  that a flash is over within 1000 ms, which is a guess. Those flashes were finger presses; the length in real
+  use is unknown.
 - **Frame metadata.** `requestVideoFrameCallback` fields for camera streams differ between browsers; "frames
   missed" shows "not reported" when the browser does not supply the count.
 - **Installed mode.** Camera behaviour in the home-screen app can differ from a Safari tab.
-- **Hardware.** The camera sees the cartridge's flash (one run). How many flashes it misses, and how the app
+- **Hardware.** The camera sees the cartridge's flash (one run, set off by finger). How many flashes it misses, and how the app
   behaves in the setup it will really be used in, are unverified. The app never claims a firearm is safe or
   unloaded.
 

@@ -1,7 +1,8 @@
 // Tunable detection settings. Every value is a starting guess chosen against
 // synthetic frames. The first runs against a real LED (2026-11-25) changed how
 // movement is told from a flash's own glow. One run with a laser cartridge
-// (2026-11-28) showed flashes lit for far longer than the LED's, which changed
+// (2026-11-28, set off by finger, not in a firearm) showed flashes lit for far
+// longer than the LED's, probably for as long as the finger pressed, which changed
 // maxEventMs and where a hit is placed. No value has been validated against a
 // known number of cartridge flashes.
 
@@ -58,7 +59,8 @@ export const DEFAULT_DETECTION_PARAMS = Object.freeze({
    * Was 400 until the first cartridge run: the hits that run counted were lit
    * for 50 to 385 ms, four of them within a frame or two of 400, so longer
    * flashes may have been refused unseen. 1000 is a guess with room to spare,
-   * not a measured upper limit.
+   * not a measured upper limit. Those flashes were finger presses: how long
+   * the flash lasts in real use is unknown.
    */
   maxEventMs: 1000,
   /** A lit area too big to be a dot is taken into the background after this long. */
